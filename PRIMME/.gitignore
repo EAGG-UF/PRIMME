@@ -1,0 +1,8 @@
+./.pylint.d
+./__pycache__
+./results_training
+./results_validation
+./saved_models
+./simulations_SPPARKS
+./data_training
+

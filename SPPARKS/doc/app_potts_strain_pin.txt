@@ -1,0 +1,52 @@
+"SPPARKS WWW Site"_sws - "SPPARKS Documentation"_sd - "SPPARKS Commands"_sc :c
+
+:link(sws,http://spparks.sandia.gov)
+:link(sd,Manual.html)
+:link(sc,Section_commands.html#comm)
+
+:line
+
+app_style potts/strain/pin command :h3
+
+[Syntax:]
+
+app_style potts/strain/pin Q :pre
+
+potts/strain/pin = application style name
+Q = number of spin states :ul
+
+[Examples:]
+
+app_style potts/strain/pin 100 :pre
+
+[Description:]
+
+This is an on-lattice application which evolves a Q-state Potts model
+with a per-site strain, where each lattice site has a spin value from
+1 to Q.  The application also allows for pinning of sites using a
+special spin value of Q+1.  Sites flip their spin as the model evolves
+but sites are not allowed to flip to a pinned value; sites with pinned
+values also do not flip.  Strain energy can influence grain growth.
+
+See the "app_style potts_strain"_app_potts_strain.html and
+"pin"_pin.html commands for details on how strain and pinned sites are
+incorporated into this application.
+
+:line
+
+The following additional commands are defined by this application:
+
+"temperature"_temperature.html : set Monte Carlo temperature
+"pin"_pin.html : set pinning parameters :tb(s=:)
+
+:line
+
+[Restrictions:] none
+
+[Related commands:]
+
+"app_style potts"_app_potts.html,
+"app_style potts_strain"_app_potts_strain.html,
+"pin"_pin.html
+
+[Default:] none

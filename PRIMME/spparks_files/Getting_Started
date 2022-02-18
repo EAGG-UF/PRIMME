@@ -1,0 +1,18 @@
+# Instruction for getting SPPARKS running on the SmartDATA Lab Lambda server:
+# Running the last two commend might also work on other linux machines
+
+# Ensure gpuenv is NOT active
+source /opt/rh/devtoolset-8/enable
+# Clone SPPARKS directory - only the included custom version of SPPARKS current works 
+# Clone PRIMME directory
+git clone https://github.com/EAGG-UF/SPPARKS-AGG.git
+# Enter PRIMME directory
+cd PRIMME/spparks_templates
+# Place Makefile.lambda into SPPARKS folder - will already be include in the included custom SPPARKS folder
+cp Makefile-lambda ../../SPPARKS/src/MAKE
+# Go into the SPPARKS-AGG/src folder
+cd ../../SPPARKS/src
+# Make lambda
+make lambda
+
+# Now PRIMME/train_model_script will run correctly, interfacing with SPPARKS
