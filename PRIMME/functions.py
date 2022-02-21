@@ -406,6 +406,7 @@ def run_spparks(size=[512,512], ngrain=512, nsteps=500, freq_dump=1, freq_stat=1
     path_home = r"../"
     path_edit_in = r"./spparks_files/spparks_%sd.in"%str(dim)
     path_edit_sh = r"./spparks_files/spparks.sh"
+    if not os.path.exists(path_sim): os.makedirs(path_sim)
     
     
     # Setup simulation file parameters
