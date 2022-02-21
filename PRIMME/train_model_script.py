@@ -45,6 +45,7 @@ import matplotlib.pyplot as plt
 from PRIMME import PRIMME
 from SPPARKS import SPPARKS
 import torch
+import os
 
 
 
@@ -60,8 +61,9 @@ min_grain = 256 # Minimum number of grains in SPPARKS image
 size      = 257 # Size of each dimension in SPPARKS
 modelname = "./saved_models/primme_grains%s_size%s_episodes%s_maxsteps%s_obs%s_act%s_kt0.5_dummy" % (str(max_grain),str(size),str(EPISODES), str(max_SPKSTEPS), str(observ_window_dim), str(action_window_dim))
 fp_results = './results_training'
-  
+if not os.path.exists(fp_results): os.makedirs(fp_results)
 
+    
 
 # RUN TRAINING EPOCHS
 env = SPPARKS(size=[size, size], obs_dim=observ_window_dim, act_dim=action_window_dim, future_window=future_window) 
