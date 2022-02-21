@@ -48,6 +48,7 @@ import torch
 import imageio
 import functions as fs
 import h5py
+import os
 
 
 
@@ -57,6 +58,7 @@ observ_window_dim = 17 # Size of action field
 modelname = "./saved_models/primme_grains256_size257_episodes200_maxsteps100_obs17_act17_kt0.5_dummy"
 fp_sims = './results_validation'
 fp_val = './data_validation'  
+if not os.path.exists(fp_sims): os.makedirs(fp_sims)
 
 
 # CREATE TEST CASE INITIAL CONDITION
