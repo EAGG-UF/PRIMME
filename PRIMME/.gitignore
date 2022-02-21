@@ -3,6 +3,6 @@
 ./results_training/*
 ./results_validation/*
 ./saved_models/*
-./simulations_SPPARKS/*
+./spparks_simulations/*
 ./data_training/*
 
