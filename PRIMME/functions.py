@@ -52,6 +52,11 @@ from scipy.stats import skew, kurtosis
 
 
 
+# SETUP NEEDED PATH
+if not os.path.exists(r"./spparks_simulations/"): os.makedirs(r"./spparks_simulations/")
+
+
+
 ### FUNCTIONS
 
 
@@ -397,16 +402,10 @@ def run_spparks(size=[512,512], ngrain=512, nsteps=500, freq_dump=1, freq_stat=1
     # Set and edit local variables
     num_processors = 1 #does not affect agg, agg can only do 1
     dim = len(size)
-    # path_sim = r"../SPPARKS/examples/agg/%sd_sim/"%str(dim)
-    # path_home = r"../../../../PRIMME/"
-    # path_edit_in = r"./spparks_templates/spparks_%sd.in"%str(dim)
-    # path_edit_sh = r"./spparks_templates/spparks.sh"
-    
     path_sim = r"./spparks_simulations/"
     path_home = r"../"
     path_edit_in = r"./spparks_files/spparks_%sd.in"%str(dim)
     path_edit_sh = r"./spparks_files/spparks.sh"
-    if not os.path.exists(path_sim): os.makedirs(path_sim)
     
     
     # Setup simulation file parameters
