@@ -1,7 +1,8 @@
 ./.pylint.d
 ./__pycache__
+./data_training/*
 ./results_training/*
 ./results_validation/*
 ./spparks_simulations/*
-./data_training/*
+
 
