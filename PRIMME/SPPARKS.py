@@ -43,6 +43,7 @@ import numpy as np
 import functions as fs
 import torch
 import torch.nn.functional as F
+import h5py
 
 
 
@@ -62,6 +63,9 @@ class SPPARKS:
         self.act_dim = act_dim
         self.future_window = future_window
         self.counter = self.nsteps
+        
+        # self.counter = 0 
+        # self.h5step = 0
 
 
     def spk_init(self): 
@@ -70,7 +74,9 @@ class SPPARKS:
         self.counter = self.nsteps
         self.img, self.EulerAngles, _ = fs.voronoi2image(self.size, self.ngrain)
         fs.image2init(self.img, self.EulerAngles)
-
+        
+        # print("empty")
+    
     
     def spk_forward(self): 
         
@@ -82,6 +88,12 @@ class SPPARKS:
         # Get SPPARKS data
         euler_angle_images, sim_steps, EulerAngles, grain_ID_images, energy_images = fs.extract_spparks_dump(len(self.size)) 
         self.spk_ID = torch.from_numpy(grain_ID_images)
+        
+        # # Load presimulated data
+        # fp = './data_training/spparks_data_size257x257_ngrain256-256_nsets200_future4_max100_offset1_kt05'
+        # with h5py.File(fp, 'r') as f:
+        #     self.spk_ID = torch.from_numpy(f["dataset"][self.h5step]).float()
+        # self.h5step += 1
         
         # Compute energy changes for firstfuture_windows steps
         self.energy_change = []

@@ -53,9 +53,7 @@ import os
 
 
 # SET UP SPPARKS ENVIRONEMENT
-action_window_dim = 17 # Size of observation field
-observ_window_dim = 17 # Size of action field
-modelname = "./saved_models/primme_grains256_size257_episodes200_maxsteps100_obs17_act17_kt0.5_dummy"
+modelname = "./saved_models/primme_grains256_size257_episodes200_maxsteps100_obs17_act17_kt05"
 fp_sims = './results_validation'
 fp_val = './data_validation'  
 if not os.path.exists(fp_sims): os.makedirs(fp_sims)
@@ -106,7 +104,7 @@ for i in range(8): #make 8 to run all tests (0 through 7)
         pad_mode = "circular"
         grain_centers = fs.read_grain_centers_txt(fp="%s/Case3_grain_centers"%fp_val)
         img, EulerAngles, center_coords = fs.voronoi2image(size=size, ngrain=grain_centers.shape[0], center_coords0=grain_centers)
-        num_steps = 1500
+        num_steps = 500
 
     if i==6:
         f = "Case3_512np" #file name, nonperiodic or 'reflect' boundaries
@@ -128,7 +126,7 @@ for i in range(8): #make 8 to run all tests (0 through 7)
 
 
     # SET UP PRIMME SIMULATOR
-    env = SPPARKS(size=size, obs_dim=observ_window_dim, act_dim=action_window_dim) 
+    env = SPPARKS(size=size) 
     agent = PRIMME(env)
     agent.ID = torch.Tensor(img).unsqueeze(2).float().to(agent.device)
     agent.pad_mode = pad_mode
@@ -153,7 +151,7 @@ for i in range(8): #make 8 to run all tests (0 through 7)
     # Save to a gif
     sim_arr = np.array(sim).astype(np.uint8)
     sim_arr_norm = int(255/np.max(sim_arr))*sim_arr
-    imageio.mimsave('%s/%s.gif'%(fp_sims, f), sim_arr_norm)
+    imageio.mimsave('%s/%s.mp4'%(fp_sims, f), sim_arr_norm)
     
     # Plot the center of mass for nonzero values of each image in the sequence
     plt.close()

@@ -1,0 +1,8 @@
+SPPARKS (18 May 2017)
+# SPPARKS AppPottsAGG test on polycrystal geometry
+# replacement_text = [rseed, ngrains, dim1, dim2, dim3, freq_stat, freq_dump, nsteps, which_sim]
+
+#Seed for RN generator
+seed   6955
+log    ${fileBase}.logfile
+log    spparks.logfile

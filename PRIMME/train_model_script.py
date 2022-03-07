@@ -59,18 +59,18 @@ future_window = 4 #Number of future SPPARKS windows to consider for training
 max_grain = 256 # Maximum number of grains in SPPARKS image
 min_grain = 256 # Minimum number of grains in SPPARKS image
 size      = 257 # Size of each dimension in SPPARKS
-modelname = "./saved_models/primme_grains%s_size%s_episodes%s_maxsteps%s_obs%s_act%s_kt0.5_dummy" % (str(max_grain),str(size),str(EPISODES), str(max_SPKSTEPS), str(observ_window_dim), str(action_window_dim))
+modelname = "./saved_models/primme_grains%s_size%s_episodes%s_maxsteps%s_obs%s_act%s_kt05" % (str(max_grain),str(size),str(EPISODES), str(max_SPKSTEPS), str(observ_window_dim), str(action_window_dim))
 fp_results = './results_training'
 if not os.path.exists(fp_results): os.makedirs(fp_results)
 
-    
+
 
 # RUN TRAINING EPOCHS
 env = SPPARKS(size=[size, size], obs_dim=observ_window_dim, act_dim=action_window_dim, future_window=future_window) 
 agent = PRIMME(env)
 grain_area_list = []
 
-for _ in tqdm(range(EPISODES), desc='Episodes', leave=True):
+for k in tqdm(range(EPISODES), desc='Episodes', leave=True):
     
     
     # Simulate training data with SPPARKS
@@ -137,14 +137,16 @@ for _ in tqdm(range(EPISODES), desc='Episodes', leave=True):
     
     
     # Plot the mean of the current action likelihood
-    action_likelihood = agent.action_likelihood.cpu().numpy().reshape(-1,action_window_dim,action_window_dim)
+    action_likelihood_mean = agent.action_likelihood_mean.cpu().numpy()
     ctr = int((action_window_dim-1)/2)
-    plt.matshow(np.mean(action_likelihood,axis=0)); plt.colorbar()
+    plt.matshow(action_likelihood_mean); plt.colorbar()
     plt.plot(ctr,ctr,marker='x'); 
     plt.show()
     
     
     # Save the model
+    # if (k+1)%10==0: 
+    #     modelname = "./saved_models/primme_grains%s_size%s_episodes%s_maxsteps%s_obs%s_act%s_kt0" % (str(max_grain),str(size),str(k+1), str(max_SPKSTEPS), str(observ_window_dim), str(action_window_dim))
     agent.save("%s" % modelname)
     
     
@@ -172,12 +174,13 @@ plt.savefig('%s/sim_vs_true.png'%fp_results)
 plt.show()
     
 # Plot of mean of action likelihood
-action_likelihood = agent.action_likelihood.cpu().numpy().reshape(-1,action_window_dim,action_window_dim)
+action_likelihood_mean = agent.action_likelihood_mean.cpu().numpy()
 ctr = int((action_window_dim-1)/2)
-plt.matshow(np.mean(action_likelihood,axis=0)); plt.colorbar()
+plt.matshow(action_likelihood_mean); plt.colorbar()
 plt.plot(ctr,ctr,marker='x'); 
 plt.savefig('%s/action_likelihood.png'%fp_results)
 plt.show()
+
 
 # Plot of training and validation accuracy
 plt.plot(agent.training_acc, '-*')

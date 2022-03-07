@@ -1,0 +1,94 @@
+
+#nspins number of spins (unique grain IDs)
+#                         nspins    Osym(24 = cubic, 12 = hexagonal)
+app_style     potts/agg     256       24
+
+dimension     2
+boundary      p p p
+lattice       sq/8n 1.0
+region        box block 0 257.0 0 257.0 0 1
+
+create_box    box
+Created box = (0 0 0) to (257 257 1)
+  1 by 1 by 1 processor grid
+create_sites  box
+Creating sites ...
+  66049 sites
+  66049 sites have 8 neighbors
+
+#Read grain ID and Euler angles for each site
+read_sites PolyIC.init
+  264196 values
+
+#KMC sampling (sweeping) algorithm
+sweep         random
+sector        yes
+
+#cutoff for high/low angle GBs in Read-Shockley implementation
+cutoff        0.0
+ Low-to-high angle cutoff reset to 0.0 deg
+
+#Humpreys Mobility
+#mobility = MO * [1 - exp(-scale * pow(thetar,expo))]
+#mobility      expo 4
+#mobility      scale 5
+#Potts Hamiltonian scaling factor J = n * sum(1-delta_ij)
+energy_scaling  1
+ PMC energy scaling by 1.
+
+#diagnostics
+diag_style      energy
+
+#PMC temperature, i.e. for Boltzmann statistics
+temperature     0.5
+
+# Print diagnostic information to screen and log file every 257.0 steps
+stats            1
+
+# Write snapshot of site values to 'spparks.dump' every 1 steps
+dump  1 text  1 ${fileBase}.dump id site d1 d2 d3 energy
+dump  1 text  1 spparks.dump id site d1 d2 d3 energy
+
+# Write 'image'; boundary between grains drawn with color = 0 0 0 aka 'black'
+#dump grain_growth_image image 25 ./Images/${fileBase}.*.jpeg site site crange 1 2500 drange 1 1 view 0 0 boundary site 1 shape cube box no 1 zoom 1.95
+#dump_modify grain_growth_image boundcolor black backcolor white scolor 2501 black pad 4
+
+# Write 'cluster/grain' diagnostics to 'spparks.cluster' every 1 steps
+diag_style       cluster stats no delt 1 filename ${fileBase}.cluster
+diag_style       cluster stats no delt 1 filename spparks.cluster
+
+# Run for 1 *spparks* steps
+run              43
+ Pairs misorientation map created
+Setting up run ...
+Running with 32-bit site IDs
+Memory usage per processor = 8.625 Mbytes
+      Time    Naccept    Nreject    Nsweeps        CPU     Energy
+         0          0          0          0          0      49548
+         1      25315     503077          8      0.381      48668
+         2      49883    1006901         16      0.759      47572
+         3      73411    1511765         24       1.82      46854
+         4      96475    2017093         32       2.48      46054
+         5     119505    2522455         40       3.03      45406
+         6     142284    3028068         48       3.38      44886
+         7     164528    3534216         56       3.73      44246
+         8     186623    4040513         64       4.06      43744
+         9     208417    4547111         72       4.39      43068
+        10     229905    5054015         80       4.72      42350
+        11     250482    5561830         88       5.04      41784
+        12     271025    6069679         96       5.35      41052
+        13     291162    6577934        104       5.65      40458
+        14     311223    7086265        112       5.96      39890
+        15     331255    7594625        120       6.27      39266
+        16     350755    8103517        128        6.6      38760
+        17     369945    8612719        136       6.92      38166
+        18     388791    9122265        144       7.24      37644
+        19     407269    9632179        152       7.55      37288
+        20     425715   10142125        160       7.85      36850
+        21     444206   10652026        168       8.17      36462
+        22     462458   11162166        176       8.49      36118
+        23     480285   11672731        184       8.79      35694
+        24     497940   12183468        192       9.08      35436
+        25     515213   12694587        200       9.41      34974
+        26     532309   13205883        208       9.73      34582
+        27     549729   13716855        216       10.1      34274

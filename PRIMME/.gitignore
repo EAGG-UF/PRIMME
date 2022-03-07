@@ -2,7 +2,6 @@
 ./__pycache__
 ./results_training/*
 ./results_validation/*
-./saved_models/*
 ./spparks_simulations/*
 ./data_training/*
 

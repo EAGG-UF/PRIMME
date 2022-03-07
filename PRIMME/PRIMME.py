@@ -93,31 +93,22 @@ class PRIMME:
       
 
     def compute_action(self):
-        n = fs.num_diff_neighbors(self.ID[...,0].reshape([1,1]+self.size), window_size=7)
+        n = fs.num_diff_neighbors(self.ID[...,0].reshape([1,1]+self.size), window_size=7, pad_mode=self.pad_mode)
         self.features = fs.my_unfoldNd(n.float(), kernel_size=self.env.obs_dim, pad_mode=self.pad_mode)[0,].transpose(0,1).reshape([np.product(self.size), self.env.obs_dim, self.env.obs_dim, 1])
         
-        # Batch the model inputs to limit memory usage 
         mem_lim = 1e9
-        nsplits = np.ceil(np.product(self.features.shape)*64/mem_lim)
-        batch_size = int(np.ceil((self.features.shape[0])/nsplits))
-        nbatches = int(self.features.shape[0]/batch_size)
-            
-        feature_batch = self.features[:batch_size].cpu().numpy()
-        action_likelihood = torch.from_numpy(self.model(feature_batch).numpy()).to(self.device)
-        # action_values = torch.argmax(action_likelihood, dim=1)
-        action_values = fs.rand_argmax(action_likelihood)
+        mem_sample = np.product(self.features.shape[1:])*64
+        batch_size = int(mem_lim/mem_sample)
+        splits = torch.split(self.features, batch_size)
         
-        
-        for i in range(1, nbatches+1):
-            start = batch_size*i
-            end = batch_size*(i+1)
-            if batch_size*(i+1)>self.features.shape[0]: end = self.features.shape[0]
-            feature_batch = self.features[start:end].cpu().numpy()
-            action_likelihood = torch.from_numpy(self.model(feature_batch).numpy()).to(self.device)
-            # action_values = torch.cat((action_values, torch.argmax(action_likelihood, dim=1)))
-            action_values = torch.cat((action_values, fs.rand_argmax(action_likelihood)))
-        self.action_likelihood = action_likelihood
-        self.action_values = action_values.to(self.device)
+        action_likelihood_sum = torch.zeros([self.env.act_dim**2]).to(self.device)
+        action_values = []
+        for s in splits: 
+            action_likelihood = torch.from_numpy(self.model.predict_on_batch(s.cpu().numpy())).to(self.device)
+            action_values.append(torch.argmax(action_likelihood, dim=1))
+            action_likelihood_sum += torch.sum(action_likelihood, dim=0)
+        self.action_likelihood_mean = (action_likelihood_sum/self.features.shape[0]).reshape(self.env.act_dim, self.env.act_dim)
+        self.action_values = torch.hstack(action_values).to(self.device)
         
 
     def apply_action(self):
@@ -147,6 +138,9 @@ class PRIMME:
     
     def load(self, name):
         self.model = load_model(name)
+        _, self.env.obs_dim, _, _ = self.model.layers[0].get_output_at(0).get_shape().as_list()
+        _, act_dim_sqr = self.model.layers[-1].get_output_at(0).get_shape().as_list()
+        self.env.act_dim = int(np.sqrt(act_dim_sqr))
 
 
     def save(self, name):

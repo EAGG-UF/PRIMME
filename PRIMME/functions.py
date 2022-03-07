@@ -367,11 +367,16 @@ def num_diff_neighbors(ims, window_size=3, pad_mode='reflect'):
     #May need to add memory management through batches for large tensors in the future
     
     if type(window_size)==int: window_size = [window_size] #convert to "list" if "int" is given
-    window_size = window_size + [window_size[-1]]*(len(ims.shape)-2-len(window_size)) #copy last dimension of window_size if needed
-    pad = tuple((torch.Tensor(window_size).repeat_interleave(2)/2).int().numpy()) #calculate padding needed based in window_size
-    ims_unfold = unfoldNd(F.pad(ims, pad, pad_mode), kernel_size=window_size) #shape = [N, product(window_size), dim1*dim2*dim3]
+    
+    ims_unfold = my_unfoldNd(ims, kernel_size=window_size, pad_mode=pad_mode)
     center_pxl_ind = int(ims_unfold.shape[1]/2)
     ims_diff_unfold = torch.sum(ims_unfold[:,center_pxl_ind,] != ims_unfold.transpose(0,1), dim=0) #shape = [N, dim1*dim2*dim3]
+    
+    # window_size = window_size + [window_size[-1]]*(len(ims.shape)-2-len(window_size)) #copy last dimension of window_size if needed
+    # pad = tuple((torch.Tensor(window_size).repeat_interleave(2)/2).int().numpy()) #calculate padding needed based in window_size
+    # ims_unfold = unfoldNd(F.pad(ims, pad, pad_mode), kernel_size=window_size) #shape = [N, product(window_size), dim1*dim2*dim3]
+    # center_pxl_ind = int(ims_unfold.shape[1]/2)
+    # ims_diff_unfold = torch.sum(ims_unfold[:,center_pxl_ind,] != ims_unfold.transpose(0,1), dim=0) #shape = [N, dim1*dim2*dim3]
     return ims_diff_unfold.reshape(ims.shape) #reshape to orignal image shape
 
 
@@ -609,7 +614,7 @@ def unison_shuffled_copies(a, b):
 
 
 
-### Written by Kristien Everett code optimized by Joseph Melville 
+### Written by Kristien Everett, code optimized by Joseph Melville 
 def grain_size(im, max_id=19999): 
     #"im" is a torch.Tensor grain id image of shape=(1,1,dim1,dim2) (only one image at a time)
     #'max_id' defines which grain id neighbors should be returned -> range(0,max_id+1)
@@ -690,3 +695,41 @@ def apply_grain_func(h5_path, func, device=torch.device("cuda:0" if torch.cuda.i
     array_stats = np.stack(l_stats)
     
     return arrays, array_stats
+
+
+
+def create_SPPARKS_dataset(fp, size=[257,257], ngrains_range=[256, 256], nsets=200, future_steps=4, max_steps=100, offset_steps=1):
+    
+    # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
+    m = np.max(ngrains_range)
+    tmp = np.array([8,16,32], dtype='uint64')
+    dtype = 'uint' + str(tmp[np.sum(m>2**tmp)])
+
+    with h5py.File(fp, 'w') as f:
+        dset = f.create_dataset("dataset", shape=(1, future_steps+1, 1, size[0], size[1]) , maxshape=(None, future_steps+1, 1, size[0], size[1]), dtype=dtype)
+        for _ in tqdm(range(nsets)):
+            
+            # SET PARAMETERS
+            ngrains = np.random.randint(ngrains_range[0], ngrains_range[1]+1) #number of grains
+            nsteps = np.random.randint(offset_steps+future_steps, max_steps) #SPPARKS steps to run
+            freq_dump = 1 #how offten to dump an image (record)
+            freq_stat = 1 #how often to report stats on the simulation
+            rseed = np.random.randint(10000) #change to get different growth from teh same initial condition
+            
+            # RUN SIMULATION
+            img, EulerAngles, center_coords0 = voronoi2image(size, ngrains) #generate initial condition
+            image2init(img, EulerAngles) #write initial condition
+            size_tmp = (np.array(size)+np.array([0.5, 0.5])).tolist()
+            _ = run_spparks(size_tmp, ngrains, nsteps, freq_dump, freq_stat, rseed) #run simulation
+            _, _, _, grain_ID_images, _ = extract_spparks_dump(dim=len(size)) #extract SPPARKS dump data to python
+                
+            # WRITE TO THE DATASET
+            dset[-1,:,:] = grain_ID_images[-(future_steps+1):,] 
+            dset.resize(dset.shape[0]+1, axis=0) 
+        dset.resize(dset.shape[0]-1, axis=0) #Remove the final dimension that has nothing written to it
+
+
+
+
+
+
