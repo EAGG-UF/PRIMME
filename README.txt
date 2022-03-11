@@ -1,6 +1,6 @@
-=========================================================
+=============================================================================================
 Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)
-=========================================================
+=============================================================================================
 
 DESCRIPTION:
 	Physics-Regularized Interpretable Machine Learning Microstructure Evolution (PRIMME)
