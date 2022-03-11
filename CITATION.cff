@@ -13,4 +13,6 @@ authors:
     given-names: Joel
 title: "Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)"
 version: 1.0
+doi: 10.5281/zenodo.1234
 date-released: 2022-03-08
+url: "https://github.com/EAGG-UF/PRIMME"
