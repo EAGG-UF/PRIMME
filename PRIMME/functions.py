@@ -8,32 +8,8 @@ DESCRIPTION:
     There are functions used for calculating micostructure features and labels
     There are also functions for custom padding and unfolding of data as well as functions for the statistical analysis of microstructures used for validation
     
-CONTRIBUTORS: 
-    Weishi Yan (1), Joel Harley (1), Joseph Melville (1), Kristien Everett (1), Lin Yang (2)
-
-AFFILIATIONS:
-    1. University of Florida, SmartDATA Lab, Department of Electrical and Computer Engineering
-    2. University of Florida, Tonks Research Group, Department of Material Science and Engineering
-
-FUNDING SPONSORS:
-    U.S. Department of Energy, Office of Science, Basic Energy Sciences under Award \#DE-SC0020384
-    U.S. Department of Defence through a Science, Mathematics, and Research for Transformation (SMART) scholarship
-    
--------------------------------------------------------------------------
-Copyright (C) 2021-2022  Joseph Melville
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at
-your option) any later version. You should have received a copy of the
-GNU General Public License along with this program. If not, see
-<http://www.gnu.org/licenses/>.
-
--------------------------------------------------------------------------
-IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
-    ***will place reference to Arxiv paper here***
-    
--------------------------------------------------------------------------
+IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite (https://arxiv.org/abs/2203.03735): 
+    Yan, Weishi, et al. "Predicting 2D Normal Grain Growth using a Physics-Regularized Interpretable Machine Learning Model." arXiv preprint arXiv:2203.03735 (2022).
 """
 
 
