@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Yan
+    given-names: Weishi
+  - family-names: Melivlle
+    given-names: Joseph 
+  - family-names: Krause
+    given-names: Amanda
+  - family-names: Tonks
+    given-names: Michael
+  - family-names: Harley
+    given-names: Joel
+title: "Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)"
+version: 1.0
+date-released: 2022-03-08
