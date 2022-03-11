@@ -15,7 +15,6 @@ FUNDING SPONSORS:
 
 FOLDERS:
 	cfg - PRIMME network architechture parameters (do not need to change)
-	data_training - presimulated SPPARKS data (future development)
 	data_validation - grain centers for validation 
 	results_training - plots and data from the "train_model_script" (created by script)
 	results_validation - plots and data from the "validation_model_script" (created by script)
@@ -24,7 +23,6 @@ FOLDERS:
 	spparks_simulations - SPPARKS simulation data and supporting files (created by script)
 
 SCRIPTS:
-	create_spparks_dataset - presimulates spparks data to use for training (future development)
 	train_model_script - trains a PRIMME model
 	PRIMME - contains PRIMME object class for training and running PRIMME simulations
 	SPPARKS - contains SPPARKS object class for running SPPARKS simulations
