@@ -10,7 +10,7 @@ GNU General Public License along with this program. If not, see
 <http://www.gnu.org/licenses/>.
 
 -------------------------------------------------------------------------
-IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
-    ***will place reference to Arxiv paper here***
+IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite (https://arxiv.org/abs/2203.03735):
+    Yan, Weishi, et al. "Predicting 2D Normal Grain Growth using a Physics-Regularized Interpretable Machine Learning Model." arXiv preprint arXiv:2203.03735 (2022).
     
 -------------------------------------------------------------------------
