@@ -1,3 +1,7 @@
+=========================================================
+Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)
+=========================================================
+
 DESCRIPTION:
 	Physics-Regularized Interpretable Machine Learning Microstructure Evolution (PRIMME)
 	This code can be used to train and validate PRIMME neural network models for simulating isotropic microstructural grain growth
