@@ -32,3 +32,16 @@ SCRIPTS:
 	SPPARKS - contains SPPARKS object class for running SPPARKS simulations
 	functions - referenced by both PRIMME and SPPARKS classes
 	validate_model_script - used to validate a specific PRIMME model
+
+REQUIRMENTS:
+	numpy
+	scipy
+	keras
+	tensorflow
+	torch
+	tqdm
+	h5py
+	unfoldNd
+	pynvml
+	matplotlib
+	imageio
