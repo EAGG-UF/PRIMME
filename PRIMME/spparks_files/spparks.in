@@ -1,0 +1,57 @@
+# SPPARKS AppPottsAGG test on polycrystal geometry
+# replacement_text = [rseed, ngrains, dim1, dim2, dim3, freq_stat, freq_dump, nsteps, which_sim, kt, cutoff, bc1, bc2, bc3, num_dims, lattice_parameters]
+
+#Seed for RN generator
+seed   ##1##
+log    ${fileBase}.logfile
+
+#nspins number of spins (unique grain IDs)
+#                         nspins    Osym(24 = cubic, 12 = hexagonal)
+app_style     potts/##9##     ##2##       24
+
+dimension     ##15##
+boundary      ##12## ##13## ##14##
+lattice       ##16## 1.0
+region        box block 0 ##3## 0 ##4## 0 ##5##
+
+create_box    box
+create_sites  box
+
+#Read grain ID and Euler angles for each site
+read_sites spparks.init
+
+#KMC sampling (sweeping) algorithm
+sweep         random
+sector        yes
+
+#cutoff for high/low angle GBs in Read-Shockley implementation
+cutoff        ##11##
+
+#Humpreys Mobility
+#mobility = MO * [1 - exp(-scale * pow(thetar,expo))]
+#mobility      expo 4
+#mobility      scale 5
+#Potts Hamiltonian scaling factor J = n * sum(1-delta_ij)
+energy_scaling  1
+
+#diagnostics
+diag_style      energy
+
+#PMC temperature, i.e. for Boltzmann statistics
+temperature     ##10##
+
+# Print diagnostic information to screen and log file every ##4## steps
+stats            ##6##
+
+# Write snapshot of site values to 'spparks.dump' every ##5## steps
+dump  1 text  ##7## ${fileBase}.dump id site d1 d2 d3 energy
+
+# Write 'image'; boundary between grains drawn with color = 0 0 0 aka 'black'
+#dump grain_growth_image image 25 ./Images/${fileBase}.*.jpeg site site crange 1 2500 drange 1 1 view 0 0 boundary site 1 shape cube box no 1 zoom 1.95
+#dump_modify grain_growth_image boundcolor black backcolor white scolor 2501 black pad 4
+
+# Write 'cluster/grain' diagnostics to 'spparks.cluster' every ##5## steps
+diag_style       cluster stats no delt ##7## filename ${fileBase}.cluster
+
+# Run for ##6## *spparks* steps
+run              ##8##

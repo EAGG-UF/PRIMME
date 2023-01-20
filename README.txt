@@ -17,22 +17,6 @@ FUNDING SPONSORS:
 	U.S. Department of Energy, Office of Science, Basic Energy Sciences under Award \#DE-SC0020384
 	U.S. Department of Defence through a Science, Mathematics, and Research for Transformation (SMART) scholarship
 
-FOLDERS:
-	cfg - PRIMME network architechture parameters (do not need to change)
-	data_validation - grain centers for validation 
-	results_training - plots and data from the "train_model_script" (created by script)
-	results_validation - plots and data from the "validation_model_script" (created by script)
-	saved_models - trained PRIMME models
-	spparks_files - files used to run SPPARKS simulations
-	spparks_simulations - SPPARKS simulation data and supporting files (created by script)
-
-SCRIPTS:
-	train_model_script - trains a PRIMME model
-	PRIMME - contains PRIMME object class for training and running PRIMME simulations
-	SPPARKS - contains SPPARKS object class for running SPPARKS simulations
-	functions - referenced by both PRIMME and SPPARKS classes
-	validate_model_script - used to validate a specific PRIMME model
-
 REQUIRMENTS:
 	numpy
 	scipy
@@ -45,3 +29,29 @@ REQUIRMENTS:
 	pynvml
 	matplotlib
 	imageio
+
+FOLDER/FILE DESCRIPTIONS:
+
+Top level folders:
+SPPARKS - 	Reference files to run SPPARKS simulations
+PRIMME - 	Actual PRIMME code
+
+"PRIMME" folder:
+cfg - 		Keras reference files
+spparks_files -	See "Getting_Started.txt" for help getting SPPARKS functioning on the lambda server
+functions - 	All of the functions used to create initial conditions, run SPPARKS and PRIMME, and calculate statistics
+PRIMME - 	A class that contains the PRIMME model and some helper functions
+run - 		References 'functions' to run and evaluate SPPARKS and PRIMME simulations
+
+"functions" file (sections):
+Script - Set up folders and GPU
+General - 			File management functions
+Create initial conditions - 	See "voronoi2image" first
+Run and read SPPARKS - 		See "run_spparks" first
+Find misorientations - 		See "find_misorientation" first
+Statistical functions - 	See "compute_grain_stats" first 
+Run PRIMME - 			See "run_primme" first 
+
+Other notes:
+-The use of GPU 0 (or CPU is GPU 0 is not available) is hard coded in two places, at the beginning of both the "PRIMME" and "functions" files
+-The output of 'run.py' is the images of a circle grain PRIMME simulation.
