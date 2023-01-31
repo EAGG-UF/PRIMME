@@ -975,11 +975,20 @@ def iterate_function(array, func, args=[], device=device):
     return np.stack(log)
 
 
-def compute_grain_stats(hps, gps='sim0', device=device):
+def compute_grain_stats(hps, gps='last', device=device):
     
-    #Make 'hps' and 'gps' a list if it isn't already
+    #Make 'hps' and 'gps' a list if it isn't already, and set default 'gps'
     if type(hps)!=list: hps = [hps]
-    if type(gps)!=list: gps = [gps]
+    
+    if gps=='last':
+        gps = []
+        for hp in hps:
+            with h5py.File(hp, 'r') as f:
+                gps.append(list(f.keys())[-1])
+        print('Last groups in each h5 file chosen:')
+        print(gps)
+    else:
+        if type(gps)!=list: gps = [gps]
     
     #Make sure the files needed actually exist
     dts = ['ims_id', 'euler_angles', 'miso_matrix']
@@ -1032,15 +1041,25 @@ def compute_grain_stats(hps, gps='sim0', device=device):
                 print('Calculated: grain_sides_avg')
 
 
-def make_videos(hps, gps='sim0'):
+def make_videos(hps, gps='last'):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already
     if type(hps)!=list: hps = [hps]
-    if type(gps)!=list: gps = [gps]
+    
+    #set default 'gps'
+    if gps=='last':
+        gps = []
+        for hp in hps:
+            with h5py.File(hp, 'r') as f:
+                gps.append(list(f.keys())[-1])
+        print('Last groups in each h5 file chosen:')
+        print(gps)
+    else:
+        if type(gps)!=list: gps = [gps]
     
     # Make sure all needed datasets exist
-    dts=['ims_id', 'ims_miso', 'ims_miso_spparks']
+    dts=['ims_id']#, 'ims_miso', 'ims_miso_spparks']
     check_exist_h5(hps, gps, dts)  
     
     for i in tqdm(range(len(hps)), "Making videos"):
@@ -1078,7 +1097,7 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
         c = tmp
     
     # Make sure all needed datasets exist
-    dts=['grain_areas', 'grain_sides', 'ims_miso', 'ims_miso_spparks']
+    dts=['grain_areas', 'grain_sides']#, 'ims_miso', 'ims_miso_spparks']
     check_exist_h5(hps, gps, dts)  
     
     # Calculate scale limit
@@ -1128,7 +1147,7 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     xs = []
     for i in range(len(hps)):
         grain_areas_avg = log[i]
-        ii = np.argmin(np.abs(grain_areas_avg-lim))
+        ii = len(grain_areas_avg) - 1 - np.argmin(np.flip(np.abs(grain_areas_avg-lim)))
         si.append(ii)
         
         x = np.arange(len(grain_areas_avg))
