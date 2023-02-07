@@ -160,8 +160,10 @@ def voronoi2image(size=[128, 64, 32], ngrain=512, memory_limit=1e9, p=2, center_
     #GENERATE RENDOM GRAIN CENTERS
     # center_coords = torch.cat([torch.randint(0, size[i], (ngrain,1)) for i in range(dim)], dim=1).float().to(device)
     # center_coords0 = torch.cat([torch.randint(0, size[i], (ngrain,1)) for i in range(dim)], dim=1).float()
-    if center_coords0==None: center_coords0 = generate_random_grain_centers(size, ngrain)
-    else: ngrain = center_coords0.shape[0]
+    if center_coords0 is None: center_coords0 = generate_random_grain_centers(size, ngrain)
+    else: 
+        center_coords0 = torch.Tensor(center_coords0)
+        ngrain = center_coords0.shape[0]
     center_coords = torch.Tensor([])
     for i in range(3): #include all combinations of dimension shifts to calculate periodic distances
         for j in range(3):
