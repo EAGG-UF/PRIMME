@@ -555,7 +555,8 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
     path_sim = './spparks_simulation_trainset/'
         
     # NAMING CONVENTION   
-    fp = './data/trainset_spparks_sz(%dx%d)_ng(%d-%d)_nsets(%d)_future(%d)_max(%d)_kt(%.2f)_cut(%d).h5'%(size[0],size[1],ngrains_rng[0],ngrains_rng[1],nsets,future_steps,max_steps,kt,cutoff)
+    sz_str = ''.join(['%dx'%i for i in size])[:-1]
+    fp = './data/trainset_spparks_sz(%s)_ng(%d-%d)_nsets(%d)_future(%d)_max(%d)_kt(%.2f)_cut(%d).h5'%(sz_str,ngrains_rng[0],ngrains_rng[1],nsets,future_steps,max_steps,kt,cutoff)
 
     # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
     m = np.max(ngrains_rng)
@@ -844,6 +845,20 @@ def find_misorientation(angles, mem_max=1, if_quat=False, device=device):
         angle0[angle0>np.pi] = torch.abs(angle0[angle0>np.pi] - 2*np.pi)
         angle_tmp = torch.min(angle0, axis=0)[0]
         angles.append(angle_tmp.cpu().numpy())
+        
+        # # Find the roation that gives the minimum angle
+        # angle0 = 2*torch.acos(qq[...,0])
+        
+        # angle0[angle0>np.pi] = angle0[angle0>np.pi] - 2*np.pi
+        
+        # i_min = torch.argmin(torch.abs(angle0), axis=0)
+        # qqmin = qq[i_min,torch.arange(len(ii))]
+        
+        # # Find and store the angle/axis values for this minimum angle rotations
+        # angle_tmp = angle0[i_min, torch.arange(len(ii))][:,None] 
+        # axis_tmp = qqmin[...,1:]/torch.sin(angle_tmp/2) #the axis might be different than spparks code, with the same misorientation angle
+        # angles.append(torch.abs(angle_tmp).cpu().numpy())
+        # axis.append(axis_tmp.cpu().numpy())
 
     return np.hstack(angles) #misorientation is the angle, radians
 
@@ -853,6 +868,12 @@ def find_misorientation(angles, mem_max=1, if_quat=False, device=device):
 
 ### Statistical functions
 #Written by Kristien Everett, code optimized and added to by Joseph Melville 
+
+# def find_frame_num_grains(grain_areas, num_grains=7500, min_pix=50):
+    # tmp = np.sum(grain_areas>min_pix, axis=1)
+    # i = np.argmin(np.abs(tmp-num_grains))
+    # return i
+    
     
 def plotly_micro(im):
     #Plot a 3D image of the microstructure "im"
@@ -881,6 +902,14 @@ def plotly_micro(im):
 #     grid = RectilinearGrid(fp, cells_coords, compression=True)
 #     grid.addCellData(DataArray(ims, range(3), 'grains'))
 #     grid.write()
+    
+
+def find_frame_num_grains(h5_group, num_grains=7500, min_pix=50):
+    grain_areas = h5_group['grain_areas'][:]
+    tmp = np.sum(grain_areas>min_pix, axis=1)
+    i = np.argmin(np.abs(tmp-num_grains))
+    # h5_group['frame_at_%d_grains'%num_grains] = np.array([i])
+    return i
 
 
 def pad_mixed(ims, pad, pad_mode="circular"):
@@ -1234,6 +1263,32 @@ def compute_grain_stats(hps, gps='last', device=device):
                 dihedral_std = iterate_function(d, func)
                 g['dihedral_std'] = dihedral_std
                 print('Calculated: dihedral_std')
+            
+            # # Find grain aspect ratios
+            # if 'aspects' not in g.keys():
+            #     args = [max_id]
+            #     func = find_aspect_ratios
+            #     aspects = iterate_function(d, func, args)
+            #     g['aspects'] = aspects
+            
+            # # Find inclination of boundary pixels
+            # if 'ims_inclination' not in g.keys():
+            #     func = fs2.find_inclination
+            #     ims_inclination = fs2.iterate_function(d[0:1,], func, args=[])[:,0]
+            #     g['ims_inclination'] = ims_inclination
+            
+            # # Setup arguments
+            # ea = g['euler_angles'][:]
+            # ims_inclination = g['ims_inclination'][:]
+            
+            # # Find angle between inclination and orientation at each boundary pixel
+            # if 'ims_inc_angle' not in g.keys():
+            #     args = [ea, ims_inclination]
+            #     func = find_inclination_orientation_angle
+            #     ims_inc_angle = iterate_function(d, func, args)[:,0]
+            #     g['ims_inc_angle'] = ims_inc_angle
+            
+            #curvature
 
 
 def make_videos(hps, gps='last'):
@@ -1262,17 +1317,24 @@ def make_videos(hps, gps='last'):
             
             g = f[gps[i]]
             
-            ims = g['ims_id'][:,0]
+            # If 3D, split down the middle of the first axis
+            sz = g['ims_id'].shape[2:]
+            dim = len(sz)
+            mid = int(sz[0]/2)
+            if dim==2: j = np.arange(sz[0])
+            elif dim==3: j = mid
+            
+            ims = g['ims_id'][:,0,j]
             ims = (255/np.max(ims)*ims).astype(np.uint8)
             imageio.mimsave('./plots/ims_id%d.mp4'%(i), ims)
             imageio.mimsave('./plots/ims_id%d.gif'%(i), ims)
             
-            ims = g['ims_miso'][:,0]
+            ims = g['ims_miso'][:,0,j]
             ims = (255/np.max(ims)*ims).astype(np.uint8)
             imageio.mimsave('./plots/ims_miso%d.mp4'%(i), ims)
             imageio.mimsave('./plots/ims_miso%d.gif'%(i), ims)
             
-            ims = g['ims_miso_spparks'][:,0]
+            ims = g['ims_miso_spparks'][:,0,j]
             ims = (255/np.max(ims)*ims).astype(np.uint8)
             imageio.mimsave('./plots/ims_miso_spparks%d.mp4'%(i), ims)
             imageio.mimsave('./plots/ims_miso_spparks%d.gif'%(i), ims)
@@ -1632,6 +1694,19 @@ def find_ncombo_avg(ncombo, sz):
     
     if len(ncombo_avg)==0: ncombo_avg = torch.zeros([5,0]).to(ncombo.device)
     
+    # num_hi = torch.sum(matches*ncombo[-2,:]==sz[0]-1, dim=1)
+    # has0 = torch.sum(matches*ncombo[-2,:]!=0, dim=1)!=nmatch
+    # tmpi = torch.sum(matches*ncombo[-2,:], dim=1)-(sz[0]*num_hi*has0)
+    # i = tmpi/nmatch #mean without zero for x direction
+    
+    # num_hi = torch.sum(matches*ncombo[-1,:]==sz[1]-1, dim=1)
+    # has0 = torch.sum(matches*ncombo[-1,:]!=0, dim=1)!=nmatch
+    # tmpj = torch.sum(matches*ncombo[-1,:], dim=1)-(sz[1]*num_hi*has0)
+    # j = tmpj/nmatch #mean without zero for y direction
+    
+    # ncombo_avg = torch.stack([*ids[0], i, j]) #add IDs back in
+    # ncombo_avg = torch.unique(ncombo_avg, dim=1) #remove duplicates
+    
     return ncombo_avg #shape=(n+2, num unique ID sets), first n values are the IDs, last two are the location indices
 
 
@@ -1727,6 +1802,56 @@ def calc_dihedral_angles(junction_angles):
 def find_dihedral_angles(im, if_plot=False, num_plot_jct=10):
     #'im' - shape=(1,1,dim1,dim2), microstructureal image in which to find junction digedral angles
     #output - shape=(6, number of junctions), first three numbers are the IDs that define the junction, the last three are the dihedral angles between ID indices 0/1, 1/2, and 0/2
+   
+    
+    
+    #I wrote this all. It ended up not being neccesary. I can't get myself to delete it yet. 
+    
+    # # Find junction and edge values and locations
+    # tmp = find_ncombo(im, n=3) #find all indices included in a triplet
+    # jct = find_ncombo_avg(tmp, im.shape[2:]) #find each triplet location
+    # jct_vals = jct[:3]
+    # jct_locs = jct[3:]
+    # edg = find_ncombo(im, n=2) #find edge indicies
+    # edg_vals = edg[:2]
+    # edg_locs = edg[2:]
+    
+    # i = torch.Tensor([[0,1],[0,2],[1,2]]).long()
+    # jct_val_combos = jct_vals[i]
+    
+    # tmp_jct_val_combos = jct_val_combos[:,:,:,None] #reshape for comparison
+    # tmp_edg_vals = edg_vals[None,:,None,:] #reshape for comparison
+    # value_matches = (tmp_jct_val_combos==tmp_edg_vals).sum(1)
+    # is_match = value_matches==2
+
+    # # 
+    # num_edge_points = is_match.sum(2)
+    # i_jct_valid = (num_edge_points>=4).all(0)
+    # jpair_edges = is_match[:,i_jct_valid,].reshape(-1,11356)
+    
+    # # Create a padded matrix to hold edge indices
+    # i, j = torch.where(jpair_edges) #jpair_edges is number of valid jpairs x number of edges
+    # edges_all = edg_locs[:,j].T
+    # edges_len = jpair_edges.sum(1)
+    # edges_split = torch.split(edges_all, list(edges_len))
+    # edges_padded = torch.nn.utils.rnn.pad_sequence(edges_split, padding_value=0)
+    
+    # # Oversample non-zero values to fill in the padded zero regions
+    # i = ((edges_len[None,])*torch.rand(edges_padded.shape[:2]).to(im.device)).long()
+    # edges = edges_padded[i, torch.arange(edges_padded.shape[1]).long(), :]
+    
+    # # Append the start junction location (ensure this is the location that is set to [0,0] for the line fit)
+    # edg_jct_locs = jct_locs[:,i_jct_valid,None].repeat(1,1,3).reshape(2,-1).permute(1,0)[None,]
+    # edges = torch.cat([edg_jct_locs, edges])
+    
+    # # Unwrap edge indices that jump from one boundary to the other
+    # h = edges.max(0)[0].max(0)[0][None,None]
+    # tmp = edges-edg_jct_locs
+    # edges = edges - h*torch.sign(tmp)*(torch.abs(tmp)>(h/2))
+    
+    # junction_ids = jct_vals[:,i_jct_valid]
+    
+    
     
     # Find triplet indices and neighbors 
     ncombo = find_ncombo(im, n=3) #find all indices included in a triplet
@@ -2052,6 +2177,7 @@ def compute_action_energy_change_miso(im, im_next, miso_matrix, energy_dim=3, ac
     #Find the current energy at each site in "im" observational windows
     #Finds the energy of "im_next" using observational windows with center pixels replaced with possible actions
     #The difference is the energy change
+    #FUTURE WORK -> If I change how the num-neighbors function works, I could probably use expand instead of repeat
     
     num_dims = len(im.shape)-2
     
@@ -2073,6 +2199,7 @@ def compute_action_energy_change_miso(im, im_next, miso_matrix, energy_dim=3, ac
 
 def compute_energy_labels_miso(im_seq, miso_matrix, act_dim=9, pad_mode="circular"):
     #Compute the action energy change between the each image and the one immediately following
+    #MAYBE CHANGE IT TO THIS IN THE FUTURE -> Compute the action energy change between the first image and all following
     #The total energy label is a decay sum of those action energy changes
     
     # CALCULATE ALL THE ACTION ENERGY CHANGES
@@ -2094,15 +2221,24 @@ def compute_energy_labels_miso(im_seq, miso_matrix, act_dim=9, pad_mode="circula
 
 
 def compute_labels_miso(im_seq, miso_matrix, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
+    
+    # energy_labels = compute_energy_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
+    
     energy_labels = compute_energy_labels_miso(im_seq, miso_matrix, act_dim=act_dim, pad_mode=pad_mode)
+    
     action_labels = compute_action_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     labels = action_labels + reg*energy_labels
+    
+    
+    # labels = (labels+reg)/(2+reg) #scale from [-reg, 1+reg] to [0,1]
+    
     return labels
 
 
 def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
     size = im.shape[1:]
     local_energy = neighborhood_miso(im, miso_matrix, window_size=7, pad_mode=pad_mode)
+    # local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
     features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
     return features
 
@@ -2110,11 +2246,12 @@ def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
 
 
 
-def train_primme(trainset, num_eps, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
+def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
     
+    with h5py.File(trainset, 'r') as f: dims = len(f['ims_id'].shape)-3
     append_name = trainset.split('_kt')[1]
     modelname = "./data/model_dim(%d)_sz(%d_%d)_lr(%.0e)_reg(%d)_ep(%d)_kt%s"%(dims, obs_dim, act_dim, lr, reg, num_eps, append_name)
-    agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, num_dims=dims)
+    agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, reg=reg, num_dims=dims)
     
     for _ in tqdm(range(num_eps), desc='Epochs', leave=True):
         agent.sample_data(trainset, batch_size=1)
@@ -2133,21 +2270,28 @@ def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', 
     agent.pad_mode = pad_mode
     im = torch.Tensor(ic).unsqueeze(0).unsqueeze(0).float().to(agent.device)
     size = ic.shape
+    dims = len(size)
     ngrain = len(torch.unique(im))
     tmp = np.array([8,16,32], dtype='uint64')
     dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
     if np.all(miso_array==None): miso_array = find_misorientation(ea, mem_max=1) 
     miso_matrix = miso_array_to_matrix(torch.from_numpy(miso_array[None,]))[0]
     append_name = modelname.split('_kt')[1]
-    fp_save = './data/primme_sz(%dx%d)_ng(%d)_nsteps(%d)_freq(1)_kt%s'%(size[0],size[1],ngrain,nsteps,append_name)
+    sz_str = ''.join(['%dx'%i for i in size])[:-1]
+    fp_save = './data/primme_sz(%s)_ng(%d)_nsteps(%d)_freq(1)_kt%s'%(sz_str,ngrain,nsteps,append_name)
     
     # Run simulation
     ims_id = im
     for _ in tqdm(range(nsteps), 'Running PRIMME simulation: '):
         im = agent.step(im.clone(), miso_matrix[None,].to(agent.device), evaluate=False)
         ims_id = torch.cat([ims_id, im])
-        if if_plot: plt.imshow(im[0,0,].cpu()); plt.show()
-    
+        if if_plot: 
+            if dims==2: 
+                plt.imshow(im[0,0,].cpu()); plt.show()
+            else: 
+                m = int(size[0]/2)
+                plt.imshow(im[0,0,m].cpu()); plt.show()
+            
     ims_id = ims_id.cpu().numpy()
     
     # Save Simulation

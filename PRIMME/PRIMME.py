@@ -34,7 +34,7 @@ class PRIMME:
         self.learning_rate = learning_rate
         self.reg = reg
         self.num_dims = num_dims
-        self.model = self._build_model()
+        self.model = self._build_model()#.to(self.device)
         self.training_loss = []
         self.validation_loss = []
         self.training_acc = []
@@ -61,6 +61,12 @@ class PRIMME:
         return model
     
     
+    # def _build_model(self): #pytorch
+    #     model = PRIMME_DNN(input_layer=self.obs_dim**self.num_dims, output_layer=self.act_dim**self.num_dims)
+    #     model.setup_training(self.learning_rate)
+    #     return model
+    
+    
     def sample_data(self, h5_path='spparks_data_size257x257_ngrain256-256_nsets200_future4_max100_offset1_kt0.h5', batch_size=1):
         with h5py.File(h5_path, 'r') as f:
             i_max = f['ims_id'].shape[0]
@@ -69,15 +75,20 @@ class PRIMME:
             miso_array = f['miso_array'][i_batch,] 
         self.im_seq = torch.from_numpy(batch[0,].astype(float)).to(self.device)
         miso_array = torch.from_numpy(miso_array.astype(float)).to(self.device)
-        self.miso_matrix = fs.miso_conversion(miso_array)
+        self.miso_matrix = fs.miso_array_to_matrix(miso_array)
         
         #Compute features and labels
-        self.features = fs.compute_features(self.im_seq[0:1,], obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        # self.features = fs.compute_features(self.im_seq[0:1,], obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         self.labels = fs.compute_labels(self.im_seq, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
+        
+        #Use miso functions
+        self.features = fs.compute_features_miso(self.im_seq[0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        # self.labels = fs.compute_labels_miso(self.im_seq, self.miso_matrix, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
         
         
     def step(self, im, miso_matrix, evaluate=True):
-        features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
         mid_ix = (np.array(features.shape[1:])/2).astype(int)
         ind = tuple([slice(None)]) + tuple(mid_ix)
         indx_use = torch.nonzero(features[ind])[:,0]
@@ -94,6 +105,7 @@ class PRIMME:
         for e in features_split:
             
             predictions = torch.Tensor(self.model.predict_on_batch(e.cpu().numpy())).to(self.device)
+            # predictions = self.model(e)
             
             action_values = torch.argmax(predictions, dim=1)
             
@@ -104,6 +116,7 @@ class PRIMME:
         if evaluate==True: self.predictions = torch.cat(predictions_split, dim=0)
         action_values = torch.hstack(action_values_split)
         
+        # self.im_next = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(im.shape)
         upated_values = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0))[0,]
         self.im_next = im.flatten().float()
         self.im_next[indx_use] = upated_values
@@ -111,13 +124,15 @@ class PRIMME:
         self.indx_use = indx_use
         
         return self.im_next
-    
-    
+
+
     def compute_metrics(self):
         im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
+        # im_next_predicted = self.im_next
         im_next_actual = self.im_seq[1:2,]
         accuracy = torch.mean((im_next_predicted==im_next_actual).float())
         loss = np.mean(tf.keras.losses.mse(self.predictions.cpu().numpy(), np.reshape(self.labels[self.indx_use,].cpu(),(-1,self.act_dim**self.num_dims))))
+        # _, loss = self.model.evaluate(self.predictions, self.labels[self.indx_use,].reshape(-1,self.act_dim**self.num_dims))
         return loss, accuracy
         
     
@@ -128,7 +143,10 @@ class PRIMME:
             self.validation_loss.append(loss)
             self.validation_acc.append(accuracy)
         
+        # features, labels = fs.unison_shuffled_copies(self.features.cpu().numpy(), self.labels.cpu().numpy()) #random shuffle 
         features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
+        # ss = int(self.obs_dim/2)
+        # indx_use = np.nonzero(features[:,ss,ss,ss])[0]
         
         mid_ix = (np.array(features.shape[1:])/2).astype(int)
         ind = tuple([slice(None)]) + tuple(mid_ix)
@@ -137,6 +155,13 @@ class PRIMME:
         features = features[indx_use,].cpu().numpy()
         labels = labels[indx_use,].cpu().numpy()
         _ = self.model.fit(features, np.reshape(labels,(-1,self.act_dim**self.num_dims)), epochs=1, verbose=0)
+        # self.training_loss.append(history.history['loss'][0])
+        # features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
+        # ss = int(self.obs_dim/2)
+        # indx_use = torch.nonzero(features[:,ss,ss,ss])[:,0]
+        # features = features[indx_use,]
+        # labels = labels[indx_use,]
+        # _ = self.model.fit(features, labels.reshape(-1,self.act_dim**self.num_dims))
         
         if evaluate: 
             loss, accuracy = self.compute_metrics()
@@ -171,6 +196,9 @@ class PRIMME:
             axs[0].set_title('Predicted')
             axs[0].axis('off')
             p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0), vmin=0, vmax=1) 
+            
+            # p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0)) 
+            # p2 = axs[1].matshow(self.labels.cpu().numpy()[0]) 
             
             fig.colorbar(p2, ax=axs[1])
             axs[1].plot(ctr,ctr,marker='x')
