@@ -49,3 +49,11 @@ fs.make_time_plots(fp_primme) #saves to 'plots'
 # fp_primme = './data/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5'
 # hps = [fp_spparks, fp_primme]
 # fs.make_time_plots(hps)
+
+
+## Cut number of features to create new trainset
+# fp = './data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5'
+# window_size=17
+# cut_f = 5000000
+# nf = fs.trainset_calcNumFeatures(fp, window_size)
+# fs.trainset_cutNumFeatures(fp, window_size, cut_f)

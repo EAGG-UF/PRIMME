@@ -645,6 +645,62 @@ def extract_spparks_logfile_energy(logfile_path="32c20000grs2400stskT050_cut25.l
                 energy[i-start_point] = float(line.split()[5])
             
     return energy
+
+
+def num_features(ims, window_size=17, pad_mode='circular'):
+    edges = num_diff_neighbors(ims, window_size, pad_mode)
+    edges_flat = edges.reshape([ims.shape[0], -1])
+    return torch.sum(edges_flat!=0, dim=1)
+
+
+def trainset_calcNumFeatures(fp, window_size, if_plot=False):
+    g = 'num_features_%d'%window_size
+    
+    if_exist = check_exist_h5([fp], [g], [], if_bool=True)
+    
+    with h5py.File(fp, 'a') as f:
+        
+        if not if_exist: 
+            
+            ni = f['ims_id'].shape[0]
+            log = []
+            for i in range(ni):
+                im = torch.Tensor(f['ims_id'][i,0][None])
+                nf = num_features(im, window_size, pad_mode='circular')
+                log.append(nf)
+            nf = torch.cat(log).cpu().numpy()
+            
+            f[g] = nf
+        else:
+            nf = f[g][:]
+    
+    if if_plot:
+        cs = np.cumsum(nf)
+        plt.figure()
+        plt.plot(cs)
+        plt.title('Cumulative number of features')
+        plt.xlabel('Number of sets')
+        plt.ylabel('Number of features')
+        plt.show()
+    
+    return nf
+
+
+def trainset_cutNumFeatures(fp, window_size, cut_f):
+
+    nf = trainset_calcNumFeatures(fp, window_size)
+    cs = np.cumsum(nf)
+    i = np.argmin((cs<cut_f).astype(int))+1
+    
+    tmp0 = fp.split('nsets(')[0]
+    tmp1 = fp.split(')_future')[1]
+    fp_new = tmp0+'nsets(%d_%df)_future'%(i,cs[i-1])+tmp1
+    
+    with h5py.File(fp, 'r') as f:
+        with h5py.File(fp_new, 'w') as fn:
+            fn['ims_id'] = f['ims_id'][:i]
+            fn['euler_angles'] = f['euler_angles'][:]
+            fn['miso_array'] = f['miso_array'][:]
             
 
 
