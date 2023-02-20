@@ -70,6 +70,23 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
     if if_bool: return True
 
 
+def my_batch(data, func, batch_sz=100):
+        #'data' is broken into a list of "batch_sz" data along dim=0
+        #"func" is then applied along dim=1 and concatenated back together
+        data_split = data.split(batch_sz, dmi=0)
+        data_list = [func(d, dim=1) for d in data_split]
+        return torch.cat(data_list)  
+    
+    
+def batch_where(data, batch_sz=100):
+    #'data' is broken into a list of "batch_sz" data along dim=0
+    #"func" is then applied along dim=1 and concatenated back together
+    data_split = data.split(batch_sz, 0)
+    data_list = [torch.where(d) for d in data_split]
+    data_list2 = [torch.stack((i+k*batch_sz,j)) for k, (i, j) in enumerate(data_list)]
+    return torch.cat(data_list2, 1)
+
+
 
 
 
@@ -1857,57 +1874,7 @@ def calc_dihedral_angles(junction_angles):
 
 def find_dihedral_angles(im, if_plot=False, num_plot_jct=10):
     #'im' - shape=(1,1,dim1,dim2), microstructureal image in which to find junction digedral angles
-    #output - shape=(6, number of junctions), first three numbers are the IDs that define the junction, the last three are the dihedral angles between ID indices 0/1, 1/2, and 0/2
-   
-    
-    
-    #I wrote this all. It ended up not being neccesary. I can't get myself to delete it yet. 
-    
-    # # Find junction and edge values and locations
-    # tmp = find_ncombo(im, n=3) #find all indices included in a triplet
-    # jct = find_ncombo_avg(tmp, im.shape[2:]) #find each triplet location
-    # jct_vals = jct[:3]
-    # jct_locs = jct[3:]
-    # edg = find_ncombo(im, n=2) #find edge indicies
-    # edg_vals = edg[:2]
-    # edg_locs = edg[2:]
-    
-    # i = torch.Tensor([[0,1],[0,2],[1,2]]).long()
-    # jct_val_combos = jct_vals[i]
-    
-    # tmp_jct_val_combos = jct_val_combos[:,:,:,None] #reshape for comparison
-    # tmp_edg_vals = edg_vals[None,:,None,:] #reshape for comparison
-    # value_matches = (tmp_jct_val_combos==tmp_edg_vals).sum(1)
-    # is_match = value_matches==2
-
-    # # 
-    # num_edge_points = is_match.sum(2)
-    # i_jct_valid = (num_edge_points>=4).all(0)
-    # jpair_edges = is_match[:,i_jct_valid,].reshape(-1,11356)
-    
-    # # Create a padded matrix to hold edge indices
-    # i, j = torch.where(jpair_edges) #jpair_edges is number of valid jpairs x number of edges
-    # edges_all = edg_locs[:,j].T
-    # edges_len = jpair_edges.sum(1)
-    # edges_split = torch.split(edges_all, list(edges_len))
-    # edges_padded = torch.nn.utils.rnn.pad_sequence(edges_split, padding_value=0)
-    
-    # # Oversample non-zero values to fill in the padded zero regions
-    # i = ((edges_len[None,])*torch.rand(edges_padded.shape[:2]).to(im.device)).long()
-    # edges = edges_padded[i, torch.arange(edges_padded.shape[1]).long(), :]
-    
-    # # Append the start junction location (ensure this is the location that is set to [0,0] for the line fit)
-    # edg_jct_locs = jct_locs[:,i_jct_valid,None].repeat(1,1,3).reshape(2,-1).permute(1,0)[None,]
-    # edges = torch.cat([edg_jct_locs, edges])
-    
-    # # Unwrap edge indices that jump from one boundary to the other
-    # h = edges.max(0)[0].max(0)[0][None,None]
-    # tmp = edges-edg_jct_locs
-    # edges = edges - h*torch.sign(tmp)*(torch.abs(tmp)>(h/2))
-    
-    # junction_ids = jct_vals[:,i_jct_valid]
-    
-    
+    #output - shape=(6, number of junctions), first three numbers are the IDs that define the junction, the last three are the dihedral angles between ID indices 0/1, 1/2, and 0/2    
     
     # Find triplet indices and neighbors 
     ncombo = find_ncombo(im, n=3) #find all indices included in a triplet
@@ -1935,19 +1902,19 @@ def find_dihedral_angles(im, if_plot=False, num_plot_jct=10):
     ncombo = find_ncombo(im, n=2) #find edge indicies
     jpair_edges = torch.all(jpair_ids.T[:,:,None]==ncombo[:-2][None,], dim=1) #These don't neccesarily include the junctions yet, because junctions are an average of triplets that don't include just these two ids
     
-    #Remove all of the jpairs that have any edge that has a length four or less
-    edges_len = jpair_edges.sum(1)
+    #Remove all of the jpairs that have any edge that has a length of four or less
+    edges_len = my_batch(jpair_edges, torch.sum, 100)
     i = (edges_len>4).reshape(-1,3).all(1)
     j = i[:,None].repeat(1,3).flatten()
     jpairs = jpairs[:,:,j]
     jpair_edges = jpair_edges[j,]
+    edges_len = edges_len[j]
     
     if len(jpair_edges)==0: return None
     
     # Create a padded matrix to hold edge indices
-    i, j = torch.where(jpair_edges)
+    i, j = batch_where(jpair_edges, 100)
     edges_all = ncombo[-2:,j].T
-    edges_len = jpair_edges.sum(1)
     edges_split = torch.split(edges_all, list(edges_len))
     edges_padded = torch.nn.utils.rnn.pad_sequence(edges_split, padding_value=0)
     
