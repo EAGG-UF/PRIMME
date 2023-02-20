@@ -24,17 +24,17 @@ import functions as fs
 # ic, ea = fs.generate_circleIC(size=[257,257], r=64) #nsteps=200, pad_mode='circular'
 # ic, ea = fs.generate_3grainIC(size=[512,512], h=350) #nsteps=300, pad_mode=['reflect', 'circular']
 # ic, ea = fs.generate_hexIC() #nsteps=500, pad_mode='circular'
-ic, ea, _ = fs.voronoi2image(size=[512, 512], ngrain=512) #nsteps=500, pad_mode='circular'
+# ic, ea, _ = fs.voronoi2image(size=[512, 512], ngrain=512) #nsteps=500, pad_mode='circular'
 # ic, ea, _ = fs.voronoi2image(size=[1024, 1024], ngrain=2**12) #nsteps=1000, pad_mode='circular'
 # ic, ea, _ = fs.voronoi2image(size=[2048, 2048], ngrain=2**14) #nsteps=1500, pad_mode='circular'
 
 
 ## Run PRIMME model
-model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(200)_kt(0.66)_cut(0).h5"
-ims_id, fp_primme = fs.run_primme(ic, ea, nsteps=10, modelname=model_location, pad_mode='circular', if_plot=True)
-fs.compute_grain_stats(fp_primme)
+# model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(200)_kt(0.66)_cut(0).h5"
+# ims_id, fp_primme = fs.run_primme(ic, ea, nsteps=10, modelname=model_location, pad_mode='circular', if_plot=True)
+# fs.compute_grain_stats(fp_primme)
 # fs.make_videos(fp_primme) #saves to 'plots'
-fs.make_time_plots(fp_primme) #saves to 'plots'
+# fs.make_time_plots(fp_primme) #saves to 'plots'
 
 
 ## Run SPPARKS model

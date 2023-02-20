@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
@@ -690,7 +690,7 @@ def trainset_cutNumFeatures(fp, window_size, cut_f):
 
     nf = trainset_calcNumFeatures(fp, window_size)
     cs = np.cumsum(nf)
-    i = np.argmin((cs<cut_f).astype(int))+1
+    i = np.argmin((np.abs(cs-cut_f)).astype(int))+1
     
     tmp0 = fp.split('nsets(')[0]
     tmp1 = fp.split(')_future')[1]
