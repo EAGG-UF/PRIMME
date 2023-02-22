@@ -461,7 +461,9 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
         miso_matrix = miso_array_to_matrix(torch.from_numpy(miso_array[None,]))[0].numpy()
         
         # Read dump
-        fp_save = './data/spparks_sz(%dx%d)_ng(%d)_nsteps(%d)_freq(%d)_kt(%.2f)_cut(%d).h5'%(np.ceil(size[0]),np.ceil(size[1]),ngrain,nsteps,freq[1],kt,cut)
+        size = ic.shape
+        sz_str = ''.join(['%dx'%i for i in size])[:-1]
+        fp_save = './data/spparks_sz(%s)_ng(%d)_nsteps(%d)_freq(%.1f)_kt(%.2f)_cut(%d).h5'%(sz_str,ngrain,nsteps,freq[1],kt,cut)
         ims_id, _, ims_energy = process_dump('%s/spparks.dump'%path_sim)
         tmp = np.array([8,16,32], dtype='uint64')
         dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
