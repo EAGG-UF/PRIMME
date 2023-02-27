@@ -683,8 +683,8 @@ def trainset_calcNumFeatures(fp, window_size, if_plot=False):
             
             ni = f['ims_id'].shape[0]
             log = []
-            for i in range(ni):
-                im = torch.Tensor(f['ims_id'][i,0][None])
+            for i in tqdm(range(ni), 'Calculating number of features for training:'):
+                im = torch.from_numpy(f['ims_id'][i,0][None].astype(int)).to(device)
                 nf = num_features(im, window_size, pad_mode='circular')
                 log.append(nf)
             nf = torch.cat(log).cpu().numpy()
