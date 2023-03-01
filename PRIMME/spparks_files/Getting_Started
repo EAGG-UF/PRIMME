@@ -3,7 +3,7 @@
 
 # Ensure gpuenv is NOT active
 source /opt/rh/devtoolset-8/enable
-# Clone SPPARKS directory (or use the SPPARKS file already in the folder)
+# Clone SPPARKS directory (or use the SPPARKS file already in the folder, only "src", "doc", "python", and "tools" folders are needed)
 https://github.com/EAGG-UF/SPPARKS-AGG.git
 # Clone PRIMME directory
 git clone https://github.com/EAGG-UF/SPPARKS-AGG.git
