@@ -2336,7 +2336,6 @@ def compute_labels_miso(im_seq, miso_matrix, obs_dim=9, act_dim=9, reg=1, pad_mo
     action_labels = compute_action_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     labels = action_labels + reg*energy_labels
     
-    
     # labels = (labels+reg)/(2+reg) #scale from [-reg, 1+reg] to [0,1]
     
     return labels
