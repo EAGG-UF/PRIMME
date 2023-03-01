@@ -372,7 +372,7 @@ def calc_MisoEnergy(fp=r"../SPPARKS/examples/agg/2d_sim/"):
     with open(fp + "MisoEnergy.txt", 'w') as file: file.writelines(tmp)
 
 
-def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, miso_array=None, which_sim='agg', bcs=['p','p','p'], save_sim=True, del_sim=False, path_sim=None):
+def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, miso_array=None, which_sim='eng', num_processors=1, bcs=['p','p','p'], save_sim=True, del_sim=False, path_sim=None):
     '''
     Runs one simulation and returns the file path where the simulation was run
     
@@ -384,11 +384,12 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
         dims: square dimension of the structure
         ngrain: number of grains
         which_sim ('agg' or 'eng'): dictates which simulator to use where eng is the latest and allows the use of multiple cores 
+        num_processors: does not affect agg, agg can only do 1
     Output:
         path_sim
     '''
     
-    # Find a simulation path that doesn't already exist (if not told exactly where to run the simulation)
+    # Find a simulation path that doesn't already exist (or if not told exactly where to run the simulation)
     if path_sim==None:
         for i in range(100): #assume I will not do more than 100 simulations at a time
             path_sim = r"./spparks_simulation_%d/"%i
@@ -406,7 +407,6 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
     dim = np.sum(np.array(size)!=1) #the number of dimensions larger than 1
     if dim==2: bcs[-1] = 'p' #if 2D, ensure last boundary condition is periodic
     ngrain = len(np.unique(ic))
-    num_processors = 1 #does not affect agg, agg can only do 1
     if rseed==None: rseed = np.random.randint(10000) #changes get different growth from the same initial condition
     freq_stat = freq[0]
     freq_dump = freq[1]
@@ -447,10 +447,11 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
     os.chdir(path_sim)
     os.system('chmod +x agg.sh')
     os.system('chmod +x eng.sh')
-    os.system('./agg.sh')
     if which_sim=='eng': 
         calc_MisoEnergy(r"./")
         os.system('./eng.sh')
+    else: 
+        os.system('./agg.sh')
     os.chdir(path_home)
     print("\nSIMULATION COMPLETE \nSIMULATION PATH: %s\n"%path_sim)
     
@@ -464,7 +465,6 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
         size = ic.shape
         sz_str = ''.join(['%dx'%i for i in size])[:-1]
         fp_save = './data/spparks_sz(%s)_ng(%d)_nsteps(%d)_freq(%.1f)_kt(%.2f)_cut(%d).h5'%(sz_str,ngrain,nsteps,freq[1],kt,cut)
-        ims_id, _, ims_energy = process_dump('%s/spparks.dump'%path_sim)
         tmp = np.array([8,16,32], dtype='uint64')
         dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
         
@@ -476,22 +476,74 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
             g = f.create_group(hp_save)
             
             # Save data
-            dset = g.create_dataset("ims_id", shape=ims_id.shape, dtype=dtype)
-            dset1 = g.create_dataset("ims_energy", shape=ims_energy.shape)
+            dset = g.create_dataset("ims_id", shape=(nsteps+1, 1,)+size, dtype=dtype)
+            dset1 = g.create_dataset("ims_energy", shape=(nsteps+1, 1,)+size)
             dset2 = g.create_dataset("euler_angles", shape=ea.shape)
             dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
             dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
-            dset[:] = ims_id
-            dset1[:] = ims_energy
             dset2[:] = ea
             dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
             dset4[:] = miso_matrix #same values as mis0_array, different format
             
-        return ims_id, fp_save
+            item_itr = process_dump_item('%s/spparks.dump'%path_sim)
+            for i, (im_id, _, im_energy) in enumerate(tqdm(item_itr, 'Reading dump', total=nsteps+1)):
+                dset[i,0] = im_id
+                dset1[i,0] = im_energy
+            
+        return fp_save
     
     if del_sim: os.system(r"rm -r %s"%path_sim) #remove entire folder
     
-    return None, None
+    return None
+
+
+def read_dump_item(path_to_dump):
+    with open(path_to_dump) as file: 
+        line = file.readline()
+        item = line[6:].replace('\n', '')
+        log = []
+        for line in file.readlines():
+            if 'ITEM:' in line:
+                data = np.stack(log)
+                yield item, data
+                item = line[6:].replace('\n', '')
+                log = []
+                
+            else:
+                data_line = np.array(line.split()).astype(float)
+                log.append(data_line)
+        # Return final item
+        data = np.stack(log)
+        yield item, data
+            
+            
+def process_dump_item(path_to_dump):
+    for i, (item, data) in enumerate(read_dump_item(path_to_dump)): 
+    
+        # if 'TIMESTEP' in item: print('\rReading step: %f'%data[0,-1], end="\r")
+        if 'BOX BOUNDS' in item: dims = np.ceil(data[:,-1]).astype(int) #z,y,x
+        if 'ATOMS id type d1 d2 d3 energy' in item:
+            
+            if i==3: #first pass through atoms
+                # Find indicies to sort data by "ATOMS: id", which is not linear when running on multiple cores
+                i_sort = np.argsort(data[:,0]) #find the sort indices for the first step (assume each step is the same order)
+                
+                # Find euler angles
+                num_grains = int(np.max(data[:,1]))
+                euler_angles = np.zeros([num_grains,3])
+                j = data[:,1].astype(int)-1 #subtract 1 so min ID is 0 and not 1
+                euler_angles[j,:] = data[:,2:-1]
+            
+            # Sort data
+            data = data[i_sort,:]
+            
+            # Arrange ID images
+            im_id = data[:,1].reshape(tuple(np.flip(dims))).transpose([2,1,0]).squeeze()-1 #subtract 1 so min ID is 0 and not 1
+            
+            # Arrange energy images
+            im_energy = data[...,-1].reshape(tuple(np.flip(dims))).transpose([2,1,0]).squeeze()
+            
+            yield im_id, euler_angles, im_energy
 
 
 def read_dump(path_to_dump='./spparks_simulations/spparks.dump'):
@@ -548,6 +600,10 @@ def process_dump(path_to_dump='./spparks_simulations/spparks.dump'):
     # Read dump
     item_names, item_data = read_dump(path_to_dump)
     
+    # Sort by "ATOMS id", which are not linear when running on multiple cores
+    i = np.argsort(item_data[3][0,:,0]) #find the sort indices for the first step (assume each step is the same order)
+    item_data[3] = item_data[3][:,i,:]
+    
     # Find simulation dimensions
     dims = np.flip(np.ceil(item_data[2][0,:,-1]).astype(int))
     
@@ -568,14 +624,16 @@ def process_dump(path_to_dump='./spparks_simulations/spparks.dump'):
     return ims_id, euler_angles, ims_energy
 
 
-def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4, del_sim=False):
+def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4, freq = (1,1), del_sim=False):
+    #'freq' - [how often to report stats on the simulation, how often to dump an image or record]
+            
     
     # SET SIMULATION PATH
     path_sim = './spparks_simulation_trainset/'
         
     # NAMING CONVENTION   
     sz_str = ''.join(['%dx'%i for i in size])[:-1]
-    fp = './data/trainset_spparks_sz(%s)_ng(%d-%d)_nsets(%d)_future(%d)_max(%d)_kt(%.2f)_cut(%d).h5'%(sz_str,ngrains_rng[0],ngrains_rng[1],nsets,future_steps,max_steps,kt,cutoff)
+    fp = './data/trainset_spparks_sz(%s)_ng(%d-%d)_nsets(%d)_future(%d)_max(%d)_kt(%.2f)_freq(%.1f)_cut(%d).h5'%(sz_str,ngrains_rng[0],ngrains_rng[1],nsets,future_steps,max_steps,kt,freq[0],cutoff)
 
     # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
     m = np.max(ngrains_rng)
@@ -596,13 +654,12 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             # SET PARAMETERS
             ngrains = np.random.randint(ngrains_rng[0], ngrains_rng[1]+1) #number of grains
             nsteps = np.random.randint(offset_steps+future_steps, max_steps+1) #SPPARKS steps to run
-            freq = (1,1) #how often to report stats on the simulation, how often to dump an image (record)
             rseed = np.random.randint(10000) #change to get different growth from teh same initial condition
             
             # RUN SIMULATION
             im, ea, _ = voronoi2image(size, ngrains) #generate initial condition
             miso_array = find_misorientation(ea, mem_max=1) 
-            run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=False, path_sim=path_sim)
+            run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=del_sim, path_sim=path_sim)
             grain_ID_images, grain_euler_angles, ims_energy = process_dump('%s/spparks.dump'%path_sim)
             # miso = np.loadtxt('%s/Miso.txt'%path_sim)*cutoff/180*np.pi #convert to radians
             
@@ -1692,6 +1749,31 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     if legend==True: plt.legend(legend)
     plt.savefig('./plots/dihedral_std_scaled', dpi=300)
     if if_show: plt.show()
+    
+    # #vizualize the relationship between area change and number of sides
+    # i=1
+    # with h5py.File(hps[i], 'r') as f: 
+    #     grain_areas = f[gps[i]+'/grain_areas'][:]
+    #     grain_sides = f[gps[i]+'/grain_sides'][:]
+    # grain_areas = grain_areas.astype(float)
+    # grain_areas[grain_areas==0] = np.nan
+    
+    # for k in range(1001):
+    #     a0 = grain_areas[:,k]
+    #     a1 = grain_sides[:,k]
+    #     b1 = a1>=6
+        
+    #     i = np.where(b1)[0]
+    #     j = np.where(~b1)[0]
+        
+    #     plt.plot(i,a0[i],'tab:blue')
+    #     plt.plot(j,a0[j],'tab:orange')
+    
+    # plt.legend(['>6 sides','<6 sides'])
+    # plt.ylim([0,10000])
+    # plt.title('Area and number of sides through time')
+    # plt.xlabel('Frame')
+    # plt.ylabel('Number of pixels')
     
     print(si)
     if not if_show: plt.close('all')
