@@ -476,8 +476,9 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
             g = f.create_group(hp_save)
             
             # Save data
-            dset = g.create_dataset("ims_id", shape=(nsteps+1, 1,)+size, dtype=dtype)
-            dset1 = g.create_dataset("ims_energy", shape=(nsteps+1, 1,)+size)
+            nsteps_tot = int(nsteps/freq_dump)
+            dset = g.create_dataset("ims_id", shape=(nsteps_tot+1, 1,)+size, dtype=dtype)
+            dset1 = g.create_dataset("ims_energy", shape=(nsteps_tot+1, 1,)+size)
             dset2 = g.create_dataset("euler_angles", shape=ea.shape)
             dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
             dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
@@ -486,7 +487,7 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
             dset4[:] = miso_matrix #same values as mis0_array, different format
             
             item_itr = process_dump_item('%s/spparks.dump'%path_sim)
-            for i, (im_id, _, im_energy) in enumerate(tqdm(item_itr, 'Reading dump', total=nsteps+1)):
+            for i, (im_id, _, im_energy) in enumerate(tqdm(item_itr, 'Reading dump', total=nsteps_tot+1)):
                 dset[i,0] = im_id
                 dset1[i,0] = im_energy
             
