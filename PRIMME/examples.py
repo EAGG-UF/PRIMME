@@ -38,7 +38,7 @@ import functions as fs
 
 
 ## Run SPPARKS model
-# ims_id, fp_spparks = fs.run_spparks(ic, ea, nsteps=1000, kt=0.66, cut=0.0)
+# fp_spparks = fs.run_spparks(ic, ea, nsteps=1000, kt=0.66, cut=0.0)
 # fs.compute_grain_stats(fp_spparks) 
 # fs.make_videos(fp_spparks) #saves to 'plots'
 # fs.make_time_plots(fp_spparks) #saves to 'plots'
