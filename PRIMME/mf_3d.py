@@ -101,12 +101,12 @@ def normal_mode_filter(im, miso_matrix, cut=0, cov=25, num_samples=64, bcs='p', 
     
     
     # Calculate neighborhood modes by batch
-    mem_total = 2*num_samples*d*num_samples*e*64/8
+    mem_total = 2*num_samples*d*num_samples*e*(64/8)
     num_batches = mem_total/memory_limit
     batch_size = int(e/num_batches)
     l = []
     coords_split = torch.split(coords, batch_size, dim=2)
-    for c in coords_split: 
+    for c in coords_split:
         
         # Sample neighborhoods
         samples = mvn.sample((num_samples, c.shape[2])).int().transpose(1,2) #sample separately for each site
@@ -529,10 +529,12 @@ def find_avg_intersect(midpoints, is_valid):
 ### MAIN
 
 
-fp = '../primme_share/PRIMME/data/primme_sz(128x128x128)_ng(8192)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5'
-with h5py.File(fp, 'r') as f:
-    ic = f['sim0/ims_id'][0,0].astype('int')
-    ea = f['sim0/euler_angles'][:].astype('int')
+# fp = '../primme_share/PRIMME/data/primme_sz(128x128x128)_ng(8192)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5'
+# with h5py.File(fp, 'r') as f:
+#     ic = f['sim0/ims_id'][0,0].astype('int')
+#     ea = f['sim0/euler_angles'][:].astype('int')
+
+ic, ea, _ = fs.voronoi2image(size=[64,64], ngrain=64)
 
 ims, fp_save = run_mf(ic, ea, nsteps=1000, cut=0, cov=3, num_samples=64)
 fs.compute_grain_stats(fp_save)
