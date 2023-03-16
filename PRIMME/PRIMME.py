@@ -91,13 +91,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class PRIMME:
-    def __init__(self, obs_dim=9, feat_dim=7, act_dim=9, pad_mode="circular", learning_rate=0.00005, reg=1, num_dims=2, cfg='./cfg/dqn_setup.json'):
+    def __init__(self, obs_dim=9, feat_dim=7, act_dim=9, pad_mode="circular", learning_rate=0.00005, batch_size=1, reg=1, num_dims=2, cfg='./cfg/dqn_setup.json'):
         self.device = device
         self.obs_dim = obs_dim
         self.feat_dim = feat_dim
         self.act_dim = act_dim
         self.pad_mode = pad_mode
         self.learning_rate = learning_rate
+        self.batch_size = batch_size
         self.reg = reg
         self.num_dims = num_dims
         self.model = self._build_model()#.to(self.device)
@@ -136,243 +137,92 @@ class PRIMME:
     def sample_data(self, h5_path='spparks_data_size257x257_ngrain256-256_nsets200_future4_max100_offset1_kt0.h5', batch_size=1):
         with h5py.File(h5_path, 'r') as f:
             
-            
-            
-            # i_max = f['ims_id'].shape[0]
-            # i_batch = np.sort(np.random.randint(low=0, high=i_max, size=(batch_size,)))
-            # batch = f['ims_id'][i_batch,]
-            # miso_array = f['miso_array'][i_batch,] 
-            
-            
-            
-            def rand_int_multi(high, batch_size, low=None, add_dims=0):
-                #Given a numpy of high indices and an int batch size
-                #Return a list of numpy arrays that are sampled from those regions
-                n = len(high)
-                size = (batch_size,)+(1,)*(add_dims)
-                if low is None: low=torch.Tensor([0,]*n).long()
-                indices = [torch.randint(low=low[i], high=high[i], size=size) for i in range(n)]
-                return indices
-            
-            
-            
-            
             # Initial variables
             s = np.array(f['ims_id'].shape)
             d = len(s)-3
             
-            
-            # Retrieve one image and it's misorientation array
+            # Retrieve one image and its misorientation array
             i_batch = np.random.randint(low=0, high=s[0])
-            batch = torch.from_numpy(f['ims_id'][i_batch,])
-            miso_array = f['miso_array'][i_batch,] 
-            
-            
-            # Sample
-            
-            
-            batch_size = 3
-            rng_size = [5,1,9,9]
-            c_shift = [0,0,-8,-8]
-            rnd_shift = [1,1,257,257] #[1,1,]+list(s[-d:])
-            
-            
-            #def sample_batch():
-            #Finds the indices needed to random sample a tensor of data
-            #'rng_size' - The size of the sample region for each dimension
-            #'c_shift' - The constant shift of the sample region for each dimension
-            #'rnd_shift' - The uniform random shift of the sample region for each dimension
-            #'batch_size' - The number of regions sampled from the tensor
-            #Returns - List of torch.Tensor, each shape=(batch_size, *rng_size)
-            #Updates - Could make not random sampling, could make generator (with yield) 
-                
-            d = len(rng_low)
-            rngs = [torch.arange(rng_low[j], rng_high[j]) for j in range(d)]
-            meshes = torch.meshgrid(rngs)
-            shifts = rand_int_multi(rnd_shift, batch_size, add_dims=d)
-            indices = [meshes[j][None]+shifts[j] for j in range(d)]                   
-            
-            #Don't forget to do circular boundaries
-            
-            
-            aaa = batch[indices]
-            
-            plt.imshow(aaa[0,4,0])
-            
-            
-            
-            
-            
-            i = rand_int_multi([1,1,]+list(s[-d:]), batch_size, add_dims=len(s)-1)
-            tmp0 = torch.arange(s[1])
-            tmp1 = torch.arange(1)
-            tmp = torch.arange(self.act_dim)-int(self.act_dim/2)
-            m = torch.meshgrid([tmp0,tmp1]+[tmp,]*d)
-            
-            ii = [m[j][None]+i[j] for j in range(len(m))]
-            
-            aaa = batch[ii]
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            #Tomorrow
-            #just load one image at a time
-            #then sample batches from that
-            #don't precalculate anything
-            
-            #Here's the plan
-            #Write a function that inputs the im_seq as is and outputs features or labels 
-            
-            
-            
-            
-            self.im_seq = torch.from_numpy(batch).to(device)
-            
-            
-            
-            
-            # j = i[0].squeeze().numpy()
-            # k = j.argsort()
-            # kb = k.argsort()
-            # miso_array = f['miso_array'][j[k]][kb]
-            
-            
-            # miso_array = f['miso_array'][np.array([8,8,105])]
-            
-            
-            s_dim = self.act_dim + self.feat_dim - 1
-            
-            tmp = torch.arange(s_dim)-int(s_dim/2)
-            m = torch.meshgrid([tmp,]*d)
-            m = [mm[None,None,None].repeat([1,s[1],1,1,1]) for mm in m]
-            i0 = (i[0] + torch.zeros(m[0].shape).long()).numpy()
-            i1 = torch.arange(5)[None,:,None,None,None]+torch.zeros([batch_size,1,1]+[s_dim,]*d).long().numpy()
-            i2 = torch.zeros([batch_size,s[1],1]+[s_dim,]*d).long().numpy()
-            i3 = [(i[j+3] + m[j])%s[j+3] for j in range(len(m))]
-            ii = (i0,i1,i2,*i3)
-            
-            
-            #Fancy indexing
-            jj = np.stack([(ii[j]*s[j+1:].prod()).flatten() for j in range(len(ii))]).sum(0)
-            
-            kk, kkb = np.unique(jj, return_inverse=True)
-            
-            with h5py.File('test.h5', 'r') as ff:
-                batch = ff['ims_id'][:][kk]#[kkb].reshape(ii[0].shape)
-            with h5py.File('test.h5', 'r') as ff:
-                aaa = ff['ims_id'][:]
-            batch = batch[kkb].reshape(ii[0].shape)
-            
-            np.sum(np.diff(jj)<=0)
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            aaa = f['ims_id'][:]
-            ims = aaa[ii]
-                
-            
-            
-            
-            
-            #Fancy indexing
-            jj = np.stack([(ii[j]*s[j+1:].prod()).flatten() for j in range(len(ii))]).sum(0)
-            
-            kk = jj.argsort()
-            kkb = kk.argsort()
-            
-            with h5py.File('test.h5', 'r') as ff:
-                batch = ff['ims_id'][jj[kk]][kkb].reshape(ii[0].shape)
-            
-            
-            
-            
-            #How long would it take to grab one feature at a time?
-            
-            
-            
-            
-            
-            
-            self.im_seq = torch.from_numpy(batch).to(device)
-            
-            
-            
-            
-            plt.imshow(batch[0,0,0])
-            
-
-            # #Just load the whole thing
-            # aaa1 = torch.from_numpy(f['ims_id'][:])
-            # bbb1 = aaa1[ii]
-            
-            # plt.imshow(bbb1[2,3,0])
-            
-            
-            
-            #No find features and labels for those 
+            self.im_seq = torch.from_numpy(f['ims_id'][i_batch,])
+            miso_array = torch.from_numpy(f['miso_array'][i_batch,][None,])
+            
+        # Sample features and labels
+        rnd_shift = [1,1,]+list(s[3:])
+        rng_size = list(self.im_seq.shape[:2])+[self.act_dim,]*d
+        _, shifts, i_lab = fs.rnd_batch(self.batch_size, rng_size, rnd_shift)
+        rng_size = list(self.im_seq.shape[:2])+[self.act_dim+self.feat_dim-1,]*d
+        _, shifts, i_feat = fs.rnd_batch(self.batch_size, rng_size, rnd_shift, shifts=shifts)
         
-        
-        
-        
-        #Okay, since indexing the h5 file directly didn't work
-        #And I don't want to load everything into memory to index because it's too large
-        #I'm just going to keep doing one image at a time, but only expand a batch of each image
-        #actually, yeah, load the whole dataset and see what happens
-        
-        miso_array = torch.from_numpy(miso_array.astype(float)).to(self.device)
+        ims_lab = self.im_seq[i_lab]
+        ims_feat = self.im_seq[i_feat]
         self.miso_matrix = fs.miso_array_to_matrix(miso_array)
-        
-        
-        
-        l = int(s_dim/2) - int(self.act_dim/2)
-        h = int(s_dim/2) + int(self.act_dim/2) + 1
-        if d==2: ims = self.im_seq[:,:,:,l:h,l:h]
-        else: ims = self.im_seq[:,:,:,l:h,l:h,l:h]
-        
-        self.labels = fs.compute_labels_batch(ims, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
-        
-        self.features = fs.compute_features_batch(self.im_seq[:,0,], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
-    
-        self.features = fs.compute_features_miso_batch(self.im_seq[:,0,], self.miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
-        
-    
-        features1 = fs.compute_features_miso(self.im_seq[0,0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        
-        
-        
-            
-        self.im_seq = torch.from_numpy(batch[0,].astype(float)).to(self.device)
-        miso_array = torch.from_numpy(miso_array.astype(float)).to(self.device)
-        self.miso_matrix = fs.miso_array_to_matrix(miso_array)
-        
-        #Compute features and labels
-        # self.features = fs.compute_features(self.im_seq[0:1,], obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        self.labels = fs.compute_labels(self.im_seq, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
-        
-        #Use miso functions
-        self.features = fs.compute_features_miso(self.im_seq[0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        # self.labels = fs.compute_labels_miso(self.im_seq, self.miso_matrix, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
+        self.labels = fs.compute_labels_batch(ims_lab, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
+        self.features = fs.compute_features_batch(ims_feat[:,0,], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
+        # self.features = fs.compute_features_miso_batch(ims_feat[:,0,].transpose(0,1), self.miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
         
         
     def step(self, im, miso_matrix, evaluate=True):
+        
+        
+        ims = im
+        batch_size = 3
+        rng_size = [1,1,23,23]
+        
+        
+        
+        
+        s = ims.shape
+        d = len(s)
+        c_shift = [0,0,]+list((-np.array(rng_size[2:])/2).astype(int)) #constant shift
+        rngs = [torch.arange(c_shift[i], c_shift[i]+rng_size[i]) for i in range(d)]
+        meshes = torch.meshgrid(rngs)
+        
+        
+        
+        
+        rnd_shift = [1,1,]+list(s[2:])
+        shifts = fs.rand_int_multi(rnd_shift, batch_size, add_dims=d)
+        
+        
+        rng_shift = list(s)#[1,1,]+list(s[2:])
+        
+        i_gen = range(int(np.prod(rng_shift)))
+        
+        for i in range(0,100+batch_size,batch_size): 
+            torch.arange()
+        
+        
+        high = rnd_shift
+        add_dims=d
+        
+        d = len(high)
+        size = (batch_size,)+(1,)*(add_dims)
+        low=torch.Tensor([0,]*d).long()
+        indices = [torch.randint(low=low[i], high=high[i], size=size) for i in range(d)]
+        
+        i_gen = range(int(np.prod(s[2:])))
+        
+        i_tot.split
+        
+        
+        from tqdm import tqdm
+        for i in tqdm(range(10)):
+            print(i)
+        
+        
+        def grid_sample():
+            
+        
+        
+        
+        
+        
+        
+        indices = [(meshes[i][None]+shifts[i])%s[i] for i in range(d)]  
+        
+        
+        
+        
         # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
         mid_ix = (np.array(features.shape[1:])/2).astype(int)
@@ -410,49 +260,10 @@ class PRIMME:
         self.indx_use = indx_use
         
         return self.im_next
-    
-    
-    # def step2(self, im, evaluate=True): #use to batch simulations if too big for memory
-        
-    #     #This batches inputs so we don't run out of memory
-    #     #This is a quick fix to be able to run a large polycrystal simulation of known dimensions (512x512x512)
-    #     #Will try to generalize this type of batching later
-        
-    #     window_size=9
-    #     pad = (int(window_size/2),)*(len(im.shape)-2)*2
-    #     features_tmp = fs.compute_features2(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-    #     features_padded = fs.pad_mixed(features_tmp, pad, self.pad_mode) 
-    #     im_padded = fs.pad_mixed(im, pad, self.pad_mode) 
-        
-    #     batches_per_dim = 8
-    #     batch_dim_size = int(im.shape[-1]/batches_per_dim)
-    #     s = torch.arange(0,im.shape[-1],batch_dim_size)
-    #     e = s+batch_dim_size+window_size-1
-    #     ee = s+batch_dim_size
-        
-    #     im_next = torch.zeros(im.shape).to(self.device)
-        
-    #     for i in range(len(s)):
-    #         for j in range(len(s)):
-    #             for k in range(len(s)):
-                    
-    #                 tmp = fs.my_unfoldNd(features_padded[:,:,s[i]:e[i],s[j]:e[j],s[k]:e[k]], kernel_size=self.act_dim, pad_mode=None)[0,]
-    #                 features_batch = tmp.T.reshape((batch_dim_size**3,)+(self.obs_dim,)*(len(im.shape)-2))
-    #                 predictions = torch.Tensor(self.model.predict_on_batch(features_batch.cpu().numpy())).to(self.device)
-    #                 action_values = torch.argmax(predictions, dim=1)
-    #                 action_features = fs.my_unfoldNd(im_padded[:,:,s[i]:e[i],s[j]:e[j],s[k]:e[k]], kernel_size=self.act_dim, pad_mode=None)[0,] 
-    #                 ss = im.shape[:2]+(batch_dim_size,)*3
-    #                 tmp = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(ss)
-    #                 im_next[:,:,s[i]:ee[i],s[j]:ee[j],s[k]:ee[k]] = tmp
-        
-    #     self.im_next = im_next
-        
-    #     return self.im_next
 
 
     def compute_metrics(self):
         im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
-        # im_next_predicted = self.im_next
         im_next_actual = self.im_seq[1:2,]
         accuracy = torch.mean((im_next_predicted==im_next_actual).float())
         loss = np.mean(tf.keras.losses.mse(self.predictions.cpu().numpy(), np.reshape(self.labels[self.indx_use,].cpu(),(-1,self.act_dim**self.num_dims))))

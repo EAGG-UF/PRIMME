@@ -87,6 +87,36 @@ def batch_where(data, batch_sz=100):
     return torch.cat(data_list2, 1)
 
 
+def rand_int_multi(high, batch_size, low=None, add_dims=0):
+    #Given a numpy of high indices and an int batch size
+    #Return a list of numpy arrays that are sampled from those regions
+    n = len(high)
+    size = (batch_size,)+(1,)*(add_dims)
+    if low is None: low=torch.Tensor([0,]*n).long()
+    indices = [torch.randint(low=low[i], high=high[i], size=size) for i in range(n)]
+    return indices
+
+
+def rnd_batch(batch_size, rng_size, rnd_shift, dim_wrap=None, meshes=None, shifts=None):
+    #Finds the indices needed to random sample a tensor of data
+    #'batch_size' - Number of regions sampled from the tensor
+    #'rng_size' - Size of the sample region for each dimension
+    #'rnd_shift' - Uniform random shift of the sample region for each dimension
+    #'dim_wrap' - Max index value for each dimension, used for wrapping
+    #Returns - List of torch.Tensor, each shape=(batch_size, *rng_size)
+    #Updates - Could make not random sampling, could make generator (with yield) 
+        
+    d = len(rng_size)
+    c_shift = [int(-rng_size[i]/2)*(rnd_shift[i]!=1) for i in range(d)] #constant shift
+    rngs = [torch.arange(c_shift[i], c_shift[i]+rng_size[i]) for i in range(d)]
+    if dim_wrap is None: dim_wrap = [np.max([rng_size[i], rnd_shift[i]]) for i in range(d)]
+    if meshes is None: meshes = torch.meshgrid(rngs)
+    if shifts is None: shifts = rand_int_multi(rnd_shift, batch_size, add_dims=d)
+    indices = [(meshes[i][None]+shifts[i])%dim_wrap[i] for i in range(d)]   
+
+    return meshes, shifts, indices
+
+
 
 
 
@@ -1279,8 +1309,9 @@ def neighborhood_miso_spparks(ims, miso_matrices, cut=25, window_size=3, pad_mod
     tmp = r*(1-torch.log(r))
     tmp[torch.isnan(tmp)] = 0
     tmp[ims_unfold_miso>cut] = 1
+    tmp = tmp.reshape(s[0],s[1],-1,tmp.shape[-1])
     
-    ims_miso = torch.sum(tmp, axis=1).reshape(s) #misorientation image
+    ims_miso = torch.sum(tmp, axis=2).reshape(s) #misorientation image
     
     return ims_miso #reshape to orignal image shape
 
@@ -2654,20 +2685,14 @@ def compute_features_batch(im, obs_dim=9, window_size=7, pad_mode='circular'):
 
 def compute_features_miso_batch(im, miso_matrix, obs_dim=9, window_size=7, pad_mode='circular'):
     
-    
     sz = im.shape
     d = len(sz)-2
     local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=window_size, pad_mode=pad_mode)
     
     l = int(sz[-1]/2) - int(obs_dim/2)
     h = int(sz[-1]/2) + int(obs_dim/2) + 1
-    if d==2: features = local_energy[:,0,l:h,l:h]
-    else: features = local_energy[:,0,l:h,l:h,l:h]
-    
-    
-    
-    size = im.shape[1:]
-    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
+    if d==2: features = local_energy[0,:,l:h,l:h]
+    else: features = local_energy[0,:,l:h,l:h,l:h]
     
     return features
 
@@ -2766,7 +2791,7 @@ def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, batc
     with h5py.File(trainset, 'r') as f: dims = len(f['ims_id'].shape)-3
     append_name = trainset.split('_kt')[1]
     modelname = "./data/model_dim(%d)_sz(%d_%d)_lr(%.0e)_reg(%d)_ep(%d)_kt%s"%(dims, obs_dim, act_dim, lr, reg, num_eps, append_name)
-    agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, reg=reg, num_dims=dims)
+    agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, batch_size=batch_size, reg=reg, num_dims=dims)
     
     for _ in tqdm(range(num_eps), desc='Epochs', leave=True):
         agent.sample_data(trainset, batch_size=batch_size)
