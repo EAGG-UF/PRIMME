@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from unfoldNd import unfoldNd 
 from PRIMME import PRIMME
 import matplotlib.colors as mcolors
-# from uvw import RectilinearGrid, DataArray
+from uvw import RectilinearGrid, DataArray
 
 
 
@@ -32,8 +32,8 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-# device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
-device=torch.device("cpu")
+device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device=torch.device("cpu")
 
 
 
@@ -68,12 +68,12 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
                     else: raise Exception('Dataset does not exist: %s/%s/%s'%(hps[i], gps[i], d))
                     
     if if_bool: return True
-
-
+    
+    
 def my_batch(data, func, batch_sz=100):
         #'data' is broken into a list of "batch_sz" data along dim=0
         #"func" is then applied along dim=1 and concatenated back together
-        data_split = data.split(batch_sz, dmi=0)
+        data_split = data.split(batch_sz, dim=0)
         data_list = [func(d, dim=1) for d in data_split]
         return torch.cat(data_list)  
     
@@ -380,7 +380,7 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
         rseed: random seed for the simulation (the same rseed and IC will grow the same)
         freq_stat: how many steps between printing stats
         freq_dump: how many steps between recording the structure
-        nsteps: number of simulation steps
+        nsteps: number of simulation steps total
         dims: square dimension of the structure
         ngrain: number of grains
         which_sim ('agg' or 'eng'): dictates which simulator to use where eng is the latest and allows the use of multiple cores 
@@ -465,6 +465,7 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
         size = ic.shape
         sz_str = ''.join(['%dx'%i for i in size])[:-1]
         fp_save = './data/spparks_sz(%s)_ng(%d)_nsteps(%d)_freq(%.1f)_kt(%.2f)_cut(%d).h5'%(sz_str,ngrain,nsteps,freq[1],kt,cut)
+        # ims_id, _, ims_energy = process_dump('%s/spparks.dump'%path_sim)
         tmp = np.array([8,16,32], dtype='uint64')
         dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
         
@@ -476,20 +477,29 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
             g = f.create_group(hp_save)
             
             # Save data
-            nsteps_tot = int(nsteps/freq_dump)
-            dset = g.create_dataset("ims_id", shape=(nsteps_tot+1, 1,)+size, dtype=dtype)
-            dset1 = g.create_dataset("ims_energy", shape=(nsteps_tot+1, 1,)+size)
+            # dset = g.create_dataset("ims_id", shape=ims_id.shape, dtype=dtype)
+            # dset1 = g.create_dataset("ims_energy", shape=ims_energy.shape)
             dset2 = g.create_dataset("euler_angles", shape=ea.shape)
             dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
             dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
+            # dset[:] = ims_id
+            # dset1[:] = ims_energy
             dset2[:] = ea
             dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
             dset4[:] = miso_matrix #same values as mis0_array, different format
             
-            item_itr = process_dump_item('%s/spparks.dump'%path_sim)
-            for i, (im_id, _, im_energy) in enumerate(tqdm(item_itr, 'Reading dump', total=nsteps_tot+1)):
-                dset[i,0] = im_id
-                dset1[i,0] = im_energy
+            
+            
+            nsteps_tot = int(nsteps/freq_dump)
+            g.create_dataset("ims_id", shape=(nsteps_tot+1, 1,)+size, dtype=dtype)
+            g.create_dataset("ims_energy", shape=(nsteps_tot+1, 1,)+size)
+            
+            
+        item_itr = process_dump_item('%s/spparks.dump'%path_sim)
+        for i, (im_id, _, im_energy) in enumerate(tqdm(item_itr, 'Reading dump', total=nsteps_tot+1)):
+            with h5py.File(fp_save, 'a') as f:
+                f[hp_save+'/ims_id'][i,0] = im_id
+                f[hp_save+'/ims_energy'][i,0] = im_energy
             
         return fp_save
     
@@ -767,7 +777,7 @@ def trainset_cutNumFeatures(fp, window_size, cut_f):
 
     nf = trainset_calcNumFeatures(fp, window_size)
     cs = np.cumsum(nf)
-    i = np.argmin((np.abs(cs-cut_f)).astype(int))+1
+    i = np.argmin((cs<cut_f).astype(int))+1
     
     tmp0 = fp.split('nsets(')[0]
     tmp1 = fp.split(')_future')[1]
@@ -1029,12 +1039,12 @@ def plotly_micro(im):
     fig.show()
 
 
-# def create_3D_paraview_vtr(ims, fp='micro_grid.vtr'):
-#     #ims.shape = (d1, d2, d3), numpy
-#     cells_coords = [np.arange(s+1)-int(s/2) for s in ims.shape]
-#     grid = RectilinearGrid(fp, cells_coords, compression=True)
-#     grid.addCellData(DataArray(ims, range(3), 'grains'))
-#     grid.write()
+def create_3D_paraview_vtr(ims, fp='micro_grid.vtr'):
+    #ims.shape = (d1, d2, d3), numpy
+    cells_coords = [np.arange(s+1)-int(s/2) for s in ims.shape]
+    grid = RectilinearGrid(fp, cells_coords, compression=True)
+    grid.addCellData(DataArray(ims, range(3), 'grains'))
+    grid.write()
     
 
 def find_frame_num_grains(h5_group, num_grains=7500, min_pix=50):
@@ -1564,7 +1574,7 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
         xx = np.linspace(ngrains,int(ngrains*scale_ngrains_ratio),ii)
         xs.append(xx)
             
-    plt.figure()
+    # plt.figure()
     legend = []
     for i in range(len(hps)):
         plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
@@ -1751,6 +1761,7 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     plt.savefig('./plots/dihedral_std_scaled', dpi=300)
     if if_show: plt.show()
     
+    
     # #vizualize the relationship between area change and number of sides
     # i=1
     # with h5py.File(hps[i], 'r') as f: 
@@ -1776,8 +1787,286 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     # plt.xlabel('Frame')
     # plt.ylabel('Number of pixels')
     
+    
     print(si)
     if not if_show: plt.close('all')
+
+
+
+
+
+### Inclination code from Lin
+
+# Basic function in Smooth Algorithm
+def output_linear_smoothing_matrix(iteration):
+# =============================================================================
+#     The function will output the bottom matrix,
+#     the matrix can be use to calculate smoothing status.
+#     bottom matrix length is 2*iteration+1
+# =============================================================================
+
+    matrix_length = 2*iteration+3
+    matrix = np.zeros((iteration, matrix_length, matrix_length))
+    matrix_unit = np.array([[1/16, 1/8, 1/16], [1/8, 1/4, 1/8], [1/16, 1/8, 1/16]])
+    matrix[iteration-1,iteration:iteration+3,iteration:iteration+3] = matrix_unit
+
+    for i in range(iteration-2,-1,-1):
+        for j in range(i+1, matrix_length-i-1):
+            for k in range(i+1, matrix_length-i-1):
+                matrix[i,j,k] += np.sum(matrix[i+1,j-1:j+2,k-1:k+2] * matrix_unit)
+
+
+
+    return matrix[0,1:-1,1:-1]
+
+
+def output_linear_smoothing_matrix3D(iteration):
+# =============================================================================
+#     The function will output the bottom matrix,
+#     the matrix can be use to calculate smoothing status.
+#     bottom matrix length is 2*iteration+1
+# =============================================================================
+
+    matrix_length = 2*iteration+3
+    sa, sb, sc, sd = 1/8, 1/16, 1/32, 1/64
+    matrix = np.zeros((iteration, matrix_length, matrix_length, matrix_length))
+    matrix_unit = np.array([[[sd,sc,sd],[sc,sb,sc],[sd,sc,sd]],
+                            [[sc,sb,sc],[sb,sa,sb],[sc,sb,sc]],
+                            [[sd,sc,sd],[sc,sb,sc],[sd,sc,sd]]])
+    matrix[iteration-1,iteration:iteration+3,iteration:iteration+3,iteration:iteration+3] = matrix_unit
+
+    for i in range(iteration-2,-1,-1):
+        for j in range(i+1, matrix_length-i-1):
+            for k in range(i+1, matrix_length-i-1):
+                for p in range(i+1, matrix_length-i-1):
+                    matrix[i,j,k,p] += np.sum(matrix[i+1,j-1:j+2,k-1:k+2,p-1:p+2] * matrix_unit)
+
+
+
+    return matrix[0,1:-1,1:-1,1:-1]
+
+
+def output_linear_vector_matrix(iteration,clip=0):
+# =============================================================================
+#     The function will output the bottom matrix,
+#     the matrix can be use to calculate vector from smoothing status.
+#     bottom matrix length is 2*iteration+1
+#     00 im 00
+#     jm CT jp
+#     00 ip 00
+# =============================================================================
+
+    matrix_length = 2*iteration+3
+    matrix_j = np.zeros((matrix_length, matrix_length))
+    matrix_i = np.zeros((matrix_length, matrix_length))
+    smoothing_matrix = output_linear_smoothing_matrix(iteration)
+    matrix_j[1:-1,2:] = smoothing_matrix
+    matrix_j[1:-1,0:-2] += -smoothing_matrix
+    matrix_i[2:,1:-1] = smoothing_matrix
+    matrix_i[0:-2,1:-1] += -smoothing_matrix
+
+    matrix_i = matrix_i[clip:matrix_length-clip, clip:matrix_length-clip]
+    matrix_j = matrix_j[clip:matrix_length-clip, clip:matrix_length-clip]
+
+    return matrix_i, matrix_j
+
+
+def output_linear_vector_matrix3D(iteration, clip=0):
+# =============================================================================
+#     The function will output the bottom matrix,
+#     the matrix can be use to calculate vector from smoothing status.
+#     bottom matrix length is 2*iteration+1
+#     00 jm 00
+# im  km CT kp   ip
+#     00 jp 00
+# =============================================================================
+
+    matrix_length = 2*iteration+3
+    matrix_j = np.zeros((matrix_length, matrix_length, matrix_length))
+    matrix_i = np.zeros((matrix_length, matrix_length, matrix_length))
+    matrix_k = np.zeros((matrix_length, matrix_length, matrix_length))
+    smoothing_matrix = output_linear_smoothing_matrix3D(iteration)
+    matrix_j[1:-1,2:,1:-1] = smoothing_matrix
+    matrix_j[1:-1,0:-2,1:-1] += -smoothing_matrix
+    matrix_i[2:,1:-1,1:-1] = smoothing_matrix
+    matrix_i[0:-2,1:-1,1:-1] += -smoothing_matrix
+    matrix_k[1:-1,1:-1,2:] = smoothing_matrix
+    matrix_k[1:-1,1:-1,0:-2] += -smoothing_matrix
+    matrix_i = matrix_i[clip:matrix_length-clip, clip:matrix_length-clip, clip:matrix_length-clip]
+    matrix_j = matrix_j[clip:matrix_length-clip, clip:matrix_length-clip, clip:matrix_length-clip]
+    matrix_k = matrix_k[clip:matrix_length-clip, clip:matrix_length-clip, clip:matrix_length-clip]
+
+    return matrix_i, matrix_j, matrix_k
+
+
+def find_window_3D(tableL,P,i,j,k):
+# =============================================================================
+#     The function will output the window around a specific site
+#     to calculate the incliantion in future
+# =============================================================================
+    fw_len = tableL
+    fw_half = int((fw_len-1)/2)
+    nx,ny,nz = P.shape
+    window = np.zeros((fw_len,fw_len,fw_len))
+
+    for wi in range(fw_len):
+        for wj in range(fw_len):
+            for wk in range(fw_len):
+                global_x = (i-fw_half+wi)%nx
+                global_y = (j-fw_half+wj)%ny
+                global_z = (k-fw_half+wk)%nz
+                if P[global_x,global_y,global_z] == P[i,j,k]:
+                    window[wi,wj,wk] = 1
+                else:
+                    window[wi,wj,wk] = 0
+
+    return window
+
+
+def find_window_2D(tableL,P,i,j):
+# =============================================================================
+#     The function will output the window around a specific site
+#     to calculate the incliantion in future
+# =============================================================================
+    fw_len = tableL
+    fw_half = int((fw_len-1)/2)
+    nx,ny = P.shape
+    window = np.zeros((fw_len,fw_len))
+
+    for wi in range(fw_len):
+        for wj in range(fw_len):
+            global_x = (i-fw_half+wi)%nx
+            global_y = (j-fw_half+wj)%ny
+            if P[global_x,global_y] == P[i,j]:
+                window[wi,wj] = 1
+            else:
+                window[wi,wj] = 0
+
+    return window
+
+
+def output_inclination_2D(loop_times, P, i, j):
+# =============================================================================
+#     The function will output the incliantion
+#     for a specific site
+# =============================================================================
+    tableL = 2*(loop_times+1)+1
+    window = np.zeros((tableL,tableL))
+    window = find_window_2D(tableL,P,i,j)
+
+    smoothed_vector_i, smoothed_vector_j = output_linear_vector_matrix(loop_times)
+
+    vec_i = np.sum(window*smoothed_vector_i)
+    vec_j = np.sum(window*smoothed_vector_j)
+    vec_len = np.sqrt(vec_i*vec_i+vec_j*vec_j)
+
+    if vec_len == 0:
+        return print("Please use boundary site")
+    else:
+        return -vec_i/vec_len, -vec_j/vec_len
+
+
+def output_inclination_3D(loop_times, P, i, j, k):
+# =============================================================================
+#     The function will output the incliantion
+#     for a specific site
+# =============================================================================
+    tableL = 2*(loop_times+1)+1
+    window = np.zeros((tableL,tableL,tableL))
+    window = find_window_3D(tableL,P,i,j,k)
+
+    smoothed_vector_i, smoothed_vector_j, smoothed_vector_k = output_linear_vector_matrix3D(loop_times)
+
+    vec_i = np.sum(window*smoothed_vector_i)
+    vec_j = np.sum(window*smoothed_vector_j)
+    vec_k = np.sum(window*smoothed_vector_k)
+    vec_len = np.sqrt(vec_i*vec_i + vec_j*vec_j + vec_k*vec_k)
+
+    return -vec_i/vec_len, -vec_j/vec_len, -vec_k/vec_len
+
+
+def unit_vector(vector):
+    return vector / np.linalg.norm(vector)
+
+
+def angle_between(v1, v2):
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+def angle_from_1_0(v):
+    a = angle_between((1,0), v)/np.pi*180
+    if v[1]<0: a = 360-a
+    return a
+
+
+def find_edge_indices(im, kernel_size=3, pad_mode='circular'):
+    #'im': torch, shape=(1,1,dim1, dim2)
+    im_unfold = my_unfoldNd(im, kernel_size)[0,]
+    is_edge = (torch.sum(im_unfold==im.reshape(1,-1), axis=0)<kernel_size**2).reshape(im.shape[2:]).cpu().numpy()
+    return np.stack(np.where(is_edge==True))
+
+
+def find_misorientation_single(q):
+    # 'q' - torch, quaternion, shape=(number of grains, 4)
+    
+    # Create and expand symmetry quaternions (assumes cubic symmetry)
+    sym = torch.from_numpy(symetric_quaternions()).to(q.device)
+    tmp = torch.arange(24)
+    i0, j0 = list(torch.cartesian_prod(tmp,tmp).T) #pair indicies for expanding the symmetry orientations
+    symi = sym[i0,:].unsqueeze(0) 
+    symj = sym[j0,:].unsqueeze(0)
+    
+    # Assign quaternions
+    qi = q[0:1,:].unsqueeze(1)
+    qj = q[1:2,:].unsqueeze(1)
+    
+    # Multiply all pairs of symmetry orientations with all pairs of grain orientations (in this chunk)
+    q1 = quat_Multi(symi, qi)
+    q2 = quat_Multi(symj, qj)
+    
+    # Find the rotations between all pairs of orientations
+    q2[...,1:] = -q2[...,1:]
+    qq = quat_Multi(q1, q2).transpose(0,1)
+    
+    # Find the roation that gives the minimum angle
+    angle0 = 2*torch.acos(qq[...,0])
+    angle0[angle0>np.pi] = torch.abs(angle0[angle0>np.pi] - 2*np.pi)
+    angle = torch.min(angle0, axis=0)[0]
+
+    return angle #misorientation is the angle, radians
+
+
+def find_inclination(im):
+    #'im': torch, shape=(1, 1, dim1, dim2)
+    
+    indxs = find_edge_indices(im)      
+    im_inc = torch.zeros(im.shape)
+    for i, j in indxs.T: 
+        v = output_inclination_2D(5, im[0,0,].cpu().numpy(), i, j)
+        im_inc[0,0,i,j] = angle_from_1_0(v)
+
+    return im_inc
+
+
+def find_inclination_orientation_angle(im, ea, im_inc):
+    #'im': torch, shape=(1, 1, dim1, dim2)
+    #'ea': numpy, euler angles, shape=(num grains, 3)
+    #'im_inc': numpy, shape=(1 ,1, dim1, dim2)
+    indxs = find_edge_indices(im)  
+    im_diff = torch.zeros(im.shape)
+    for i, j in indxs.T: #for each boundary pixel index
+    
+        ids = im[0,0,i,j].cpu().numpy()
+        e = torch.from_numpy(ea[ids,][None,])
+        q1 = euler2quaternion(e)[0] #convert it to a quaternion
+        a = im_inc[0,0,i,j]/180*np.pi #find the inclination and convert it to radians
+        ax = np.array([1,0,0]) #choose an arbitrary axis
+        q2 = torch.from_numpy(np.concatenate([ax*np.sin(a/2), np.array([np.cos(a/2)])]))#convert angle axis to quaternion
+        q = torch.stack([q1,q2])
+        im_diff[0,0,i,j] = find_misorientation_single(q)
+        
+    return im_diff
 
 
 
@@ -1959,8 +2248,8 @@ def calc_dihedral_angles(junction_angles):
 
 def find_dihedral_angles(im, if_plot=False, num_plot_jct=10):
     #'im' - shape=(1,1,dim1,dim2), microstructureal image in which to find junction digedral angles
-    #output - shape=(6, number of junctions), first three numbers are the IDs that define the junction, the last three are the dihedral angles between ID indices 0/1, 1/2, and 0/2    
-    
+    #output - shape=(6, number of junctions), first three numbers are the IDs that define the junction, the last three are the dihedral angles between ID indices 0/1, 1/2, and 0/2
+   
     # Find triplet indices and neighbors 
     ncombo = find_ncombo(im, n=3) #find all indices included in a triplet
     ncombo_avg = find_ncombo_avg(ncombo, im.shape[2:]) #find the average location of those found in the same triplet
@@ -2268,6 +2557,124 @@ def compute_features(im, obs_dim=9, pad_mode='circular'):
 
 
 
+
+def compute_action_energy_change_batch(im, im_next, energy_dim=3, act_dim=9, pad_mode="circular"):
+    #Calculate the energy change introduced by actions in each "im" action window
+    #Energy is calculated as the number of different neighbors for each observation window
+    #Find the current energy at each site in "im" observational windows
+    #Finds the energy of "im_next" using observational windows with center pixels replaced with possible actions
+    #The difference is the energy change
+    #FUTURE WORK -> If I change how the num-neighbors function works, I could probably use expand instead of repeat
+    
+    d = len(im.shape)-2
+    
+    # Find current energy
+    low = int(act_dim/2) - int(energy_dim/2)
+    high = int(act_dim/2) + int(energy_dim/2) + 1
+    tmp0 = torch.arange(im.shape[0])
+    tmp = torch.arange(low, high)
+    i = torch.meshgrid([tmp0]+[tmp,]*d)
+    current_region = im_next[:,0,][i].reshape(im.shape[0], -1)[...,None]
+    current_energy = num_diff_neighbors_inline(current_region)
+    
+    # Find action energy
+    center = int(energy_dim**d/2)
+    action_regions = current_region.repeat(1,1,act_dim**d)
+    new_centers = im.reshape(im.shape[0],-1)
+    action_regions[:,center,:] = new_centers
+    action_energy = num_diff_neighbors_inline(action_regions)
+    
+    energy_change = ((current_energy-action_energy)/(energy_dim**d-1))[...,None]
+    
+    return energy_change
+    
+
+def compute_energy_labels_batch(im_seq, act_dim=9, pad_mode="circular"):
+    #Compute the action energy change between the each image and the one immediately following
+    #MAYBE CHANGE IT TO THIS IN THE FUTURE -> Compute the action energy change between the first image and all following
+    #The total energy label is a decay sum of those action energy changes
+    
+    # CALCULATE ALL THE ACTION ENERGY CHANGES
+    s = im_seq.shape
+    energy_changes = []
+    for i in range(im_seq.shape[1]-1):
+        ims_curr = im_seq[:,i]
+        ims_next = im_seq[:,i+1]
+        energy_change = compute_action_energy_change_batch(ims_curr, ims_next, act_dim=act_dim, pad_mode=pad_mode)
+        energy_changes.append(energy_change)
+    
+    # COMBINE THEM USING A DECAY SUM
+    energy_change = torch.cat(energy_changes, dim=2)
+    decay_rate = 1/2
+    decay = decay_rate**torch.arange(1,im_seq.shape[1]).reshape(1,1,-1).to(im_seq.device)
+    energy_labels = torch.sum(energy_change*decay, dim=2).reshape((s[0],)+(act_dim,)*(len(s)-3))
+    
+    return energy_labels
+
+
+def compute_action_labels_batch(im_seq, act_dim=9, pad_mode="circular"):
+    #Label which actions in each action window were actually taken between the first image and all following
+    #The total energy label is a decay sum of those action labels
+
+    d = im_seq.dim()-3
+    ims = im_seq[:,0,0,].reshape(im_seq.shape[0],1,-1)
+    c = int(act_dim**d/2)
+    future_centers = im_seq[:,1:,0,].reshape(im_seq.shape[0], im_seq.shape[1]-1, -1)[...,c:c+1]
+    
+    actions_marked = (ims==future_centers).permute(1,2,0)
+    decay_rate = 1/2
+    decay = decay_rate**torch.arange(1,im_seq.shape[1]).reshape(-1,1,1).to(ims.device)
+    
+    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((ims.shape[0],)+(act_dim,)*d)
+    
+    return action_labels
+
+
+def compute_labels_batch(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
+    
+    energy_labels = compute_energy_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
+    action_labels = compute_action_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
+    labels = action_labels + reg*energy_labels
+    return labels
+
+
+def compute_features_batch(im, obs_dim=9, window_size=7, pad_mode='circular'):
+    
+    sz = im.shape
+    d = len(sz)-2
+    local_energy = num_diff_neighbors(im, window_size=window_size, pad_mode=pad_mode)
+    
+    l = int(sz[-1]/2) - int(obs_dim/2)
+    h = int(sz[-1]/2) + int(obs_dim/2) + 1
+    if d==2: features = local_energy[:,0,l:h,l:h]
+    else: features = local_energy[:,0,l:h,l:h,l:h]
+    
+    return features
+
+
+def compute_features_miso_batch(im, miso_matrix, obs_dim=9, window_size=7, pad_mode='circular'):
+    
+    
+    sz = im.shape
+    d = len(sz)-2
+    local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=window_size, pad_mode=pad_mode)
+    
+    l = int(sz[-1]/2) - int(obs_dim/2)
+    h = int(sz[-1]/2) + int(obs_dim/2) + 1
+    if d==2: features = local_energy[:,0,l:h,l:h]
+    else: features = local_energy[:,0,l:h,l:h,l:h]
+    
+    
+    
+    size = im.shape[1:]
+    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
+    
+    return features
+
+
+
+
+
 def neighborhood_miso_inline(ims_unfold, miso_matrix): 
     # ims - torch.Tensor of shape [# of images, 1, dim1, dim2, dim3(optional)]
     # miso_matrices: grain id misorientations, shape=(num_images, dim1, dim2)
@@ -2337,6 +2744,7 @@ def compute_labels_miso(im_seq, miso_matrix, obs_dim=9, act_dim=9, reg=1, pad_mo
     action_labels = compute_action_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     labels = action_labels + reg*energy_labels
     
+    
     # labels = (labels+reg)/(2+reg) #scale from [-reg, 1+reg] to [0,1]
     
     return labels
@@ -2344,8 +2752,8 @@ def compute_labels_miso(im_seq, miso_matrix, obs_dim=9, act_dim=9, reg=1, pad_mo
 
 def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
     size = im.shape[1:]
-    local_energy = neighborhood_miso(im, miso_matrix, window_size=7, pad_mode=pad_mode)
-    # local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
+    # local_energy = neighborhood_miso(im, miso_matrix, window_size=7, pad_mode=pad_mode)
+    local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
     features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
     return features
 
@@ -2353,7 +2761,7 @@ def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
 
 
 
-def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
+def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, batch_size=1, pad_mode="circular", if_plot=False):
     
     with h5py.File(trainset, 'r') as f: dims = len(f['ims_id'].shape)-3
     append_name = trainset.split('_kt')[1]
@@ -2361,7 +2769,7 @@ def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_
     agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, reg=reg, num_dims=dims)
     
     for _ in tqdm(range(num_eps), desc='Epochs', leave=True):
-        agent.sample_data(trainset, batch_size=1)
+        agent.sample_data(trainset, batch_size=batch_size)
         agent.train()
         if if_plot: agent.plot()
         agent.save(modelname)
