@@ -143,187 +143,165 @@ class PRIMME:
             
             # Retrieve one image and its misorientation array
             i_batch = np.random.randint(low=0, high=s[0])
-            self.im_seq = torch.from_numpy(f['ims_id'][i_batch,])
-            miso_array = torch.from_numpy(f['miso_array'][i_batch,][None,])
+            im_seq = torch.from_numpy(f['ims_id'][i_batch,]).to(device)
+            miso_array = torch.from_numpy(f['miso_array'][i_batch,][None,]).to(device)
             
         # Sample features and labels
         rnd_shift = [1,1,]+list(s[3:])
-        rng_size = list(self.im_seq.shape[:2])+[self.act_dim,]*d
+        rng_size = list(im_seq.shape[:2])+[self.act_dim,]*d
         _, shifts, i_lab = fs.rnd_batch(self.batch_size, rng_size, rnd_shift)
-        rng_size = list(self.im_seq.shape[:2])+[self.act_dim+self.feat_dim-1,]*d
+        rng_size = list(im_seq.shape[:2])+[self.act_dim+self.feat_dim-1,]*d
         _, shifts, i_feat = fs.rnd_batch(self.batch_size, rng_size, rnd_shift, shifts=shifts)
         
-        ims_lab = self.im_seq[i_lab]
-        ims_feat = self.im_seq[i_feat]
+        # Don't use samples where the action space has all the same values
+        ims_lab = im_seq[i_lab]
+        act_region = ims_lab[:,0,0].reshape(self.batch_size,-1)
+        use_i = ((act_region[:,0:1]==act_region).sum(1)!=act_region.shape[1]).nonzero()[:,0]
+        
+        # Calculate features
+        ims_feat = im_seq[i_feat][use_i,]
         self.miso_matrix = fs.miso_array_to_matrix(miso_array)
-        self.labels = fs.compute_labels_batch(ims_lab, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
         self.features = fs.compute_features_batch(ims_feat[:,0,], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
         # self.features = fs.compute_features_miso_batch(ims_feat[:,0,].transpose(0,1), self.miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
+        
+        # Calculate labels
+        ims_lab = ims_lab[use_i,]
+        self.act_region = ims_lab[:,0,0] #ids of regions that the action labels are calculated from using the first image
+        self.labels = fs.compute_labels_batch(ims_lab, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
+        self.labels_ids = ims_lab[:,1,0,].reshape(ims_lab.shape[0],-1)[:,int(self.act_dim**d/2)]        
         
         
     def step(self, im, miso_matrix, evaluate=True):
         
-        
-        ims = im
-        batch_size = 3
-        rng_size = [1,1,23,23]
-        
-        
-        
-        
-        s = ims.shape
+        s = im.shape[2:]
         d = len(s)
-        c_shift = [0,0,]+list((-np.array(rng_size[2:])/2).astype(int)) #constant shift
-        rngs = [torch.arange(c_shift[i], c_shift[i]+rng_size[i]) for i in range(d)]
-        meshes = torch.meshgrid(rngs)
+        im_next = im.clone()
         
-        
-        
-        
-        rnd_shift = [1,1,]+list(s[2:])
-        shifts = fs.rand_int_multi(rnd_shift, batch_size, add_dims=d)
-        
-        
-        rng_shift = list(s)#[1,1,]+list(s[2:])
-        
-        i_gen = range(int(np.prod(rng_shift)))
-        
-        for i in range(0,100+batch_size,batch_size): 
-            torch.arange()
-        
-        
-        high = rnd_shift
-        add_dims=d
-        
-        d = len(high)
-        size = (batch_size,)+(1,)*(add_dims)
-        low=torch.Tensor([0,]*d).long()
-        indices = [torch.randint(low=low[i], high=high[i], size=size) for i in range(d)]
-        
-        i_gen = range(int(np.prod(s[2:])))
-        
-        i_tot.split
-        
-        
-        from tqdm import tqdm
-        for i in tqdm(range(10)):
-            print(i)
-        
-        
-        def grid_sample():
+        rng_size = [1,1,]+[self.obs_dim+self.feat_dim-1]*d
+        for _, shifts, i in fs.unfold_gen(self.batch_size, rng_size, im.shape): 
             
-        
-        
-        
-        
-        
-        
-        indices = [(meshes[i][None]+shifts[i])%s[i] for i in range(d)]  
-        
-        
-        
-        
-        # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
-        mid_ix = (np.array(features.shape[1:])/2).astype(int)
-        ind = tuple([slice(None)]) + tuple(mid_ix)
-        indx_use = torch.nonzero(features[ind])[:,0]
-        features = features[indx_use,]
-        
-        action_features = fs.my_unfoldNd(im, kernel_size=self.act_dim, pad_mode=self.pad_mode)[0,] 
-        action_features = action_features[...,indx_use]
-        
-        batch_size = 5000
-        features_split = torch.split(features, batch_size)
-        predictions_split = []
-        action_values_split = []
-        
-        for e in features_split:
+            sample = im[i]
+            features = fs.compute_features_batch(sample[:,0], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
+            # features = fs.compute_features_miso_batch(aaa[:,0].transpose(0,1), miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode) #use miso functions
             
-            predictions = torch.Tensor(self.model.predict_on_batch(e.cpu().numpy())).to(self.device)
-            # predictions = self.model(e)
-            
-            action_values = torch.argmax(predictions, dim=1)
-            
-            if evaluate==True: 
-                predictions_split.append(predictions)
-            action_values_split.append(action_values)
-                
-        if evaluate==True: self.predictions = torch.cat(predictions_split, dim=0)
-        action_values = torch.hstack(action_values_split)
-        
-        # self.im_next = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(im.shape)
-        upated_values = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0))[0,]
-        self.im_next = im.flatten().float()
-        self.im_next[indx_use] = upated_values
-        self.im_next = self.im_next.reshape(im.shape)
-        self.indx_use = indx_use
+            predictions = torch.Tensor(self.model.predict_on_batch(features.cpu().numpy()))
+            center_i = [shifts[j+2].squeeze() for j in range(d)]
+            act_i = torch.argmax(predictions, dim=1)
+            act_i = fs.unflatten_index(act_i, features.shape[1:])
+            act_i = [(act_i[j] + center_i[j] - int(self.act_dim/2))% s[j] for j in range(d)]
+            tmp = np.zeros(self.batch_size)
+            im_next[[tmp,tmp,]+center_i] = im[[tmp,tmp,]+act_i]
         
         return self.im_next
+        
+        
+        
+        # # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        # features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
+        # mid_ix = (np.array(features.shape[1:])/2).astype(int)
+        # ind = tuple([slice(None)]) + tuple(mid_ix)
+        # indx_use = torch.nonzero(features[ind])[:,0]
+        # features = features[indx_use,]
+        
+        # action_features = fs.my_unfoldNd(im, kernel_size=self.act_dim, pad_mode=self.pad_mode)[0,] 
+        # action_features = action_features[...,indx_use]
+        
+        # batch_size = 5000
+        # features_split = torch.split(features, batch_size)
+        # predictions_split = []
+        # action_values_split = []
+        
+        # for e in features_split:
+            
+        #     predictions = torch.Tensor(self.model.predict_on_batch(e.cpu().numpy())).to(self.device)
+        #     # predictions = self.model(e)
+            
+        #     action_values = torch.argmax(predictions, dim=1)
+            
+        #     if evaluate==True: 
+        #         predictions_split.append(predictions)
+        #     action_values_split.append(action_values)
+                
+        # if evaluate==True: self.predictions = torch.cat(predictions_split, dim=0)
+        # action_values = torch.hstack(action_values_split)
+        
+        # # self.im_next = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(im.shape)
+        # upated_values = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0))[0,]
+        # self.im_next = im.flatten().float()
+        # self.im_next[indx_use] = upated_values
+        # self.im_next = self.im_next.reshape(im.shape)
+        # self.indx_use = indx_use
+        
+        # return self.im_next
 
 
-    def compute_metrics(self):
-        im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
-        im_next_actual = self.im_seq[1:2,]
-        accuracy = torch.mean((im_next_predicted==im_next_actual).float())
-        loss = np.mean(tf.keras.losses.mse(self.predictions.cpu().numpy(), np.reshape(self.labels[self.indx_use,].cpu(),(-1,self.act_dim**self.num_dims))))
-        # _, loss = self.model.evaluate(self.predictions, self.labels[self.indx_use,].reshape(-1,self.act_dim**self.num_dims))
+    def compute_metrics(self, is_validation=False):
+        
+        n = self.features.shape[0] #number of features
+        self.predictions = torch.Tensor(self.model.predict_on_batch(self.features.cpu().numpy())).reshape(self.labels.shape)
+        i = torch.argmax(self.predictions.reshape(n,-1), dim=1)
+        self.predictions_ids = self.act_region.reshape(n,-1)[np.arange(n), i]
+        accuracy = torch.mean((self.predictions_ids==self.labels_ids).float())
+        loss = np.mean(tf.keras.losses.mse(self.predictions.reshape(n,-1).cpu().numpy(), self.labels.reshape(n,-1).cpu().numpy()))
+        
+        if is_validation:
+            self.validation_loss.append(loss)
+            self.validation_acc.append(accuracy)
+        else: #is training
+            self.training_loss.append(loss)
+            self.training_acc.append(accuracy)
+        
         return loss, accuracy
         
+        # im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
+        # im_next_actual = self.im_seq[1:2,]
+        # accuracy = torch.mean((im_next_predicted==im_next_actual).float())
+        # loss = np.mean(tf.keras.losses.mse(self.predictions.cpu().numpy(), np.reshape(self.labels[self.indx_use,].cpu(),(-1,self.act_dim**self.num_dims))))
+        # # _, loss = self.model.evaluate(self.predictions, self.labels[self.indx_use,].reshape(-1,self.act_dim**self.num_dims))
+        # return loss, accuracy
+    
     
     def train(self, evaluate=True):
         
-        if evaluate: 
-            loss, accuracy = self.compute_metrics()
-            self.validation_loss.append(loss)
-            self.validation_acc.append(accuracy)
+        if evaluate: loss, accuracy = self.compute_metrics(is_validation=True)
         
-        # features, labels = fs.unison_shuffled_copies(self.features.cpu().numpy(), self.labels.cpu().numpy()) #random shuffle 
-        features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
-        # ss = int(self.obs_dim/2)
-        # indx_use = np.nonzero(features[:,ss,ss,ss])[0]
-        
-        mid_ix = (np.array(features.shape[1:])/2).astype(int)
-        ind = tuple([slice(None)]) + tuple(mid_ix)
-        indx_use = torch.nonzero(features[ind])[:,0]
-        
-        features = features[indx_use,].cpu().numpy()
-        labels = labels[indx_use,].cpu().numpy()
+        features = self.features.cpu().numpy()
+        labels = self.labels.cpu().numpy()
         _ = self.model.fit(features, np.reshape(labels,(-1,self.act_dim**self.num_dims)), epochs=1, verbose=0)
-        # self.training_loss.append(history.history['loss'][0])
-        # features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
-        # ss = int(self.obs_dim/2)
-        # indx_use = torch.nonzero(features[:,ss,ss,ss])[:,0]
-        # features = features[indx_use,]
-        # labels = labels[indx_use,]
-        # _ = self.model.fit(features, labels.reshape(-1,self.act_dim**self.num_dims))
         
-        if evaluate: 
-            loss, accuracy = self.compute_metrics()
-            self.training_loss.append(loss)
-            self.training_acc.append(accuracy)
+        if evaluate: loss, accuracy = self.compute_metrics(is_validation=False)
+        
+        
+        # features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
+        
+        # mid_ix = (np.array(features.shape[1:])/2).astype(int)
+        # ind = tuple([slice(None)]) + tuple(mid_ix)
+        # indx_use = torch.nonzero(features[ind])[:,0]
+        
+        # features = features[indx_use,].cpu().numpy()
+        # labels = labels[indx_use,].cpu().numpy()
         
     
     def plot(self, fp_results='./plots'):
         
         if self.num_dims==2:
-            #Plot the next images, predicted and true, together
-            fig, axs = plt.subplots(1,3)
-            axs[0].matshow(self.im_seq[0,0,].cpu().numpy())
-            axs[0].set_title('Current')
-            axs[0].axis('off')
-            axs[1].matshow(self.im_next[0,0,].cpu().numpy()) 
-            axs[1].set_title('Predicted Next')
-            axs[1].axis('off')
-            axs[2].matshow(self.im_seq[1,0,].cpu().numpy()) 
-            axs[2].set_title('True Next')
-            axs[2].axis('off')
-            plt.savefig('%s/sim_vs_true.png'%fp_results)
-            plt.show()
+            # #Plot the next images, predicted and true, together
+            # fig, axs = plt.subplots(1,3)
+            # axs[0].matshow(self.im_seq[0,0,].cpu().numpy())
+            # axs[0].set_title('Current')
+            # axs[0].axis('off')
+            # axs[1].matshow(self.im_next[0,0,].cpu().numpy()) 
+            # axs[1].set_title('Predicted Next')
+            # axs[1].axis('off')
+            # axs[2].matshow(self.im_seq[1,0,].cpu().numpy()) 
+            # axs[2].set_title('True Next')
+            # axs[2].axis('off')
+            # plt.savefig('%s/sim_vs_true.png'%fp_results)
+            # plt.show()
             
             #Plot the action distributions, predicted and true, together
             ctr = int((self.act_dim-1)/2)
-            pred = self.predictions.reshape(-1, self.act_dim, self.act_dim).detach().cpu().numpy()
+            pred = self.predictions.detach().cpu().numpy()
             fig, axs = plt.subplots(1,2)
             p1 = axs[0].matshow(np.mean(pred, axis=0), vmin=0, vmax=1)
             fig.colorbar(p1, ax=axs[0])
@@ -331,10 +309,6 @@ class PRIMME:
             axs[0].set_title('Predicted')
             axs[0].axis('off')
             p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0), vmin=0, vmax=1) 
-            
-            # p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0)) 
-            # p2 = axs[1].matshow(self.labels.cpu().numpy()[0]) 
-            
             fig.colorbar(p2, ax=axs[1])
             axs[1].plot(ctr,ctr,marker='x')
             axs[1].set_title('True')
@@ -358,25 +332,25 @@ class PRIMME:
             plt.close('all')
         
         if self.num_dims==3:
-            bi = int(self.im_seq.shape[-1]/2)
             
-            #Plot the next images, predicted and true, together
-            fig, axs = plt.subplots(1,3)
-            axs[0].matshow(self.im_seq[0,0,...,bi].cpu().numpy())
-            axs[0].set_title('Current')
-            axs[0].axis('off')
-            axs[1].matshow(self.im_next[0,0,...,bi].cpu().numpy()) 
-            axs[1].set_title('Predicted Next')
-            axs[1].axis('off')
-            axs[2].matshow(self.im_seq[1,0,...,bi].cpu().numpy()) 
-            axs[2].set_title('True Next')
-            axs[2].axis('off')
-            plt.savefig('%s/sim_vs_true.png'%fp_results)
-            plt.show()
+            # #Plot the next images, predicted and true, together
+            # bi = int(self.im_seq.shape[-1]/2)
+            # fig, axs = plt.subplots(1,3)
+            # axs[0].matshow(self.im_seq[0,0,...,bi].cpu().numpy())
+            # axs[0].set_title('Current')
+            # axs[0].axis('off')
+            # axs[1].matshow(self.im_next[0,0,...,bi].cpu().numpy()) 
+            # axs[1].set_title('Predicted Next')
+            # axs[1].axis('off')
+            # axs[2].matshow(self.im_seq[1,0,...,bi].cpu().numpy()) 
+            # axs[2].set_title('True Next')
+            # axs[2].axis('off')
+            # plt.savefig('%s/sim_vs_true.png'%fp_results)
+            # plt.show()
             
             #Plot the action distributions, predicted and true, together
             ctr = int((self.act_dim-1)/2)
-            pred = self.predictions.reshape(-1, self.act_dim, self.act_dim, self.act_dim).detach().cpu().numpy()
+            pred = self.predictions.detach().cpu().numpy()
             fig, axs = plt.subplots(1,2)
             p1 = axs[0].matshow(np.mean(pred, axis=0)[...,ctr], vmin=0, vmax=1)
             fig.colorbar(p1, ax=axs[0])

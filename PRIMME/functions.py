@@ -117,6 +117,58 @@ def rnd_batch(batch_size, rng_size, rnd_shift, dim_wrap=None, meshes=None, shift
     return meshes, shifts, indices
 
 
+def ranger(batch_size, i_max):
+    #Returns lists of indicies between each output of range()
+    #The final output is cut to fit within the 'i_max' limit
+    for i in range(0, i_max, batch_size):
+        yield torch.arange(i, np.clip(i+batch_size, 0, i_max))
+        
+
+def unflatten_index(i, shape):
+    #'i' - flattened indicies in 1D numpy array
+    #'shape' - reshaping dimensions, 1D numpy array
+    
+    # Shape indicies
+    i_new = []
+    tmp = i
+    for j in range(len(shape)-1):
+        i_tmp, tmp = np.divmod(tmp, np.prod(shape[j+1:]))
+        i_new.append(i_tmp)
+    i_new.append(tmp)
+    
+    return tuple(torch.stack(i_new))
+
+
+def unsqueeze_multi(arrs, add_dims):
+    #Adds 'add_dims' number of 'None' dimensions to the end of each array in 'arrs' 
+    not_list = type(arrs) is not list
+    if not_list: arrs = [arrs]
+    
+    for i in range(len(arrs)): 
+        for _ in range(add_dims): 
+            arrs[i] = arrs[i].unsqueeze(-1)
+            
+    if not_list: arrs = arrs[0]    
+    return arrs
+
+
+def unfold_gen(batch_size, rng_size, shape):
+    #Generates indices to index an image of shape 'shape'
+    #'batch_size' - Number of regions to yield
+    #'rng_size' - Size of tach regions
+    
+    d = len(shape)
+    c_shift = [0,0,]+list((-np.array(rng_size[2:])/2).astype(int)) #constant shift
+    rngs = [torch.arange(c_shift[i], c_shift[i]+rng_size[i]) for i in range(d)]
+    meshes = torch.meshgrid(rngs)
+    
+    for i in ranger(batch_size, i_max=np.prod(shape)): 
+        shifts = unflatten_index(i, shape)
+        shifts = tuple(unsqueeze_multi(list(shifts), d))
+        indices = [(meshes[i][None]+shifts[i])%shape[i] for i in range(d)] 
+        yield meshes, shifts, indices
+
+
 
 
 
@@ -2665,7 +2717,8 @@ def compute_labels_batch(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular
     
     energy_labels = compute_energy_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     action_labels = compute_action_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
-    labels = action_labels + reg*energy_labels
+    labels = ((action_labels + reg*energy_labels)+reg)/(2*reg+1) #normalize to between zero and one
+    
     return labels
 
 
