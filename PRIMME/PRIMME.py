@@ -121,7 +121,7 @@ class PRIMME:
         h9 = BatchNormalization()(h7)
         h8 = Dense(21*21, activation='relu')(h7)
         h9 = BatchNormalization()(h8)
-        output = Dense(self.act_dim**self.num_dims,  activation='sigmoid')(h9)
+        output = Dense(self.act_dim**self.num_dims,  activation='relu')(h9)
         model = Model(inputs=state_input, outputs=output)
         adam = Adam(learning_rate=self.learning_rate)
         model.compile(optimizer=adam, loss='mse')
@@ -173,26 +173,54 @@ class PRIMME:
         
     def step(self, im, miso_matrix, evaluate=True):
         
-        s = im.shape[2:]
-        d = len(s)
-        im_next = im.clone()
         
-        rng_size = [1,1,]+[self.obs_dim+self.feat_dim-1]*d
-        for _, shifts, i in fs.unfold_gen(self.batch_size, rng_size, im.shape): 
-            
-            sample = im[i]
-            features = fs.compute_features_batch(sample[:,0], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
-            # features = fs.compute_features_miso_batch(aaa[:,0].transpose(0,1), miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode) #use miso functions
-            
-            predictions = torch.Tensor(self.model.predict_on_batch(features.cpu().numpy()))
-            center_i = [shifts[j+2].squeeze() for j in range(d)]
-            act_i = torch.argmax(predictions, dim=1)
-            act_i = fs.unflatten_index(act_i, features.shape[1:])
-            act_i = [(act_i[j] + center_i[j] - int(self.act_dim/2))% s[j] for j in range(d)]
-            tmp = np.zeros(self.batch_size)
-            im_next[[tmp,tmp,]+center_i] = im[[tmp,tmp,]+act_i]
         
-        return self.im_next
+        features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode='circular')
+        use_i = (features[:,8,8]!=0).nonzero()[:,0]
+        
+        aaa = fs.my_unfoldNd(im, self.act_dim, pad_mode='circular')[0].T
+        # use_i = ((aaa[:,0:1]!=aaa).sum(1)!=0).nonzero()[:,0]
+        
+        predictions = torch.Tensor(self.model.predict_on_batch(features[use_i].cpu().numpy()))
+        bbb = torch.argmax(predictions,dim=1)
+        
+        im_next = im.clone().flatten()
+        im_next[use_i] = aaa[use_i, bbb]
+        im_next = im_next.reshape(im.shape)
+        
+        
+        
+        
+        
+        
+        # s = im.shape[2:]
+        # d = len(s)
+        # im_next = im.clone()
+        
+        # rng_size = [1,1,]+[self.obs_dim+self.feat_dim-1]*d
+        # for _, shifts, i in fs.unfold_gen(self.batch_size, rng_size, im.shape): 
+            
+        #     # Trim to only regions that don't all have the same value
+        #     _, _, j = fs.rnd_batch(batch_size=10000, rng_size=[1,1,17,17], rnd_shift=[0,0,1024,1024], shifts=shifts)
+        #     tmp = im[j]
+        #     use_i = ((tmp[:,0:1,0,0,0]!=tmp.reshape(i[0].shape[0],-1)).sum(1)!=0).nonzero()[:,0]
+        #     shifts = [ii[use_i,] for ii in shifts]
+        #     i = [ii[use_i,] for ii in i]
+            
+            
+        #     sample = im[i]
+        #     features = fs.compute_features_batch(sample[:,0], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
+        #     # features = fs.compute_features_miso_batch(aaa[:,0].transpose(0,1), miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode) #use miso functions
+            
+        #     predictions = torch.Tensor(self.model.predict_on_batch(features.cpu().numpy()))
+        #     center_i = [shifts[j+2].squeeze() for j in range(d)]
+        #     act_i = torch.argmax(predictions, dim=1)
+        #     act_i = fs.unflatten_index(act_i, features.shape[1:])
+        #     act_i = [(act_i[j] + center_i[j] - int(self.act_dim/2))% s[j] for j in range(d)]
+        #     tmp = np.zeros(i[0].shape[0])
+        #     im_next[[tmp,tmp,]+center_i] = im[[tmp,tmp,]+act_i]
+        
+        return im_next
         
         
         
@@ -320,11 +348,11 @@ class PRIMME:
             fig, axs = plt.subplots(1,2)
             axs[0].plot(self.validation_loss, '-*', label='Validation')
             axs[0].plot(self.training_loss, '--*', label='Training')
-            axs[0].set_title('Loss')
+            axs[0].set_title('Loss(%1.3f)'%self.validation_loss[-1])
             axs[0].legend()
             axs[1].plot(self.validation_acc, '-*', label='Validation')
             axs[1].plot(self.training_acc, '--*', label='Training')
-            axs[1].set_title('Accuracy')
+            axs[1].set_title('Accuracy(%1.3f)'%self.validation_acc[-1])
             axs[1].legend()
             plt.savefig('%s/train_val_loss_accuracy.png'%fp_results)
             plt.show()

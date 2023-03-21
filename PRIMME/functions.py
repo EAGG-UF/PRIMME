@@ -2717,7 +2717,13 @@ def compute_labels_batch(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular
     
     energy_labels = compute_energy_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     action_labels = compute_action_labels_batch(im_seq, act_dim=act_dim, pad_mode=pad_mode)
-    labels = ((action_labels + reg*energy_labels)+reg)/(2*reg+1) #normalize to between zero and one
+    # labels = ((action_labels + reg*energy_labels)+reg)/(2*reg+1) #normalize to between zero and one!!!
+    
+    # tmp = action_labels + reg*energy_labels
+    # labels = (tmp-torch.min(tmp))/torch.max(tmp-torch.min(tmp)) #normalize to between zero and one!!!
+    
+    labels = action_labels + reg*energy_labels #normalize to between zero and one!!!
+    
     
     return labels
 
@@ -2858,7 +2864,7 @@ def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, batc
 def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', if_plot=False):
     
     # Setup
-    agent = PRIMME()
+    agent = PRIMME(batch_size=10000)
     agent.load(modelname)
     agent.pad_mode = pad_mode
     im = torch.Tensor(ic).unsqueeze(0).unsqueeze(0).float().to(agent.device)
