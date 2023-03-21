@@ -32,7 +32,7 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 # device=torch.device("cpu")
 
 
@@ -131,8 +131,12 @@ def unflatten_index(i, shape):
     # Shape indicies
     i_new = []
     tmp = i
-    for j in range(len(shape)-1):
-        i_tmp, tmp = np.divmod(tmp, np.prod(shape[j+1:]))
+    for j in range(len(shape)-1): 
+        # i_tmp, tmp0 = np.divmod(tmp, np.prod(shape[j+1:]))
+        
+        i_tmp = torch.div(tmp, np.prod(shape[j+1:]), rounding_mode='floor')
+        tmp = tmp%np.prod(shape[j+1:])
+        
         i_new.append(i_tmp)
     i_new.append(tmp)
     

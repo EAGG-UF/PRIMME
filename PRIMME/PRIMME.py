@@ -26,8 +26,8 @@ import matplotlib.pyplot as plt
 # Setup gpu access
 import tensorflow as tf
 physical_devices = tf.config.list_physical_devices('GPU')
-tf.config.set_visible_devices(physical_devices[1], 'GPU') #0:5
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+tf.config.set_visible_devices(physical_devices[4], 'GPU') #0:5
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
 
 
 
@@ -121,7 +121,7 @@ class PRIMME:
         h9 = BatchNormalization()(h7)
         h8 = Dense(21*21, activation='relu')(h7)
         h9 = BatchNormalization()(h8)
-        output = Dense(self.act_dim**self.num_dims,  activation='relu')(h9)
+        output = Dense(self.act_dim**self.num_dims,  activation='sigmoid')(h9)
         model = Model(inputs=state_input, outputs=output)
         adam = Adam(learning_rate=self.learning_rate)
         model.compile(optimizer=adam, loss='mse')
@@ -175,18 +175,64 @@ class PRIMME:
         
         
         
-        features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode='circular')
-        use_i = (features[:,8,8]!=0).nonzero()[:,0]
         
-        aaa = fs.my_unfoldNd(im, self.act_dim, pad_mode='circular')[0].T
-        # use_i = ((aaa[:,0:1]!=aaa).sum(1)!=0).nonzero()[:,0]
         
-        predictions = torch.Tensor(self.model.predict_on_batch(features[use_i].cpu().numpy()))
-        bbb = torch.argmax(predictions,dim=1)
         
-        im_next = im.clone().flatten()
-        im_next[use_i] = aaa[use_i, bbb]
+        # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
+        mid_ix = (np.array(features.shape[1:])/2).astype(int)
+        ind = tuple([slice(None)]) + tuple(mid_ix)
+        indx_use = torch.nonzero(features[ind])[:,0]
+        features = features[indx_use,]
+        
+        action_features = fs.my_unfoldNd(im, kernel_size=self.act_dim, pad_mode=self.pad_mode)[0,] 
+        action_features = action_features[...,indx_use]
+        
+        batch_size = 5000
+        features_split = torch.split(features, batch_size)
+        action_values_split = []
+        
+        for e in features_split:
+            
+            predictions = torch.Tensor(self.model.predict_on_batch(e.cpu().numpy())).to(self.device)
+            action_values = torch.argmax(predictions, dim=1)
+            action_values_split.append(action_values)
+                
+        action_values = torch.hstack(action_values_split)
+        
+        # self.im_next = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(im.shape)
+        upated_values = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0))[0,]
+        im_next = im.flatten().float()
+        im_next[indx_use] = upated_values
         im_next = im_next.reshape(im.shape)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode='circular')
+        # use_i = (features[:,8,8]!=0).nonzero()[:,0]
+        
+        # aaa = fs.my_unfoldNd(im, self.act_dim, pad_mode='circular')[0].T
+        # # use_i = ((aaa[:,0:1]!=aaa).sum(1)!=0).nonzero()[:,0]
+        
+        # predictions = torch.Tensor(self.model.predict_on_batch(features[use_i].cpu().numpy()))
+        # bbb = torch.argmax(predictions,dim=1)
+        
+        # im_next = im.clone().flatten()
+        # im_next[use_i] = aaa[use_i, bbb]
+        # im_next = im_next.reshape(im.shape)
+        
+        
+        
+        
+        
         
         
         
@@ -205,19 +251,19 @@ class PRIMME:
         #     tmp = im[j]
         #     use_i = ((tmp[:,0:1,0,0,0]!=tmp.reshape(i[0].shape[0],-1)).sum(1)!=0).nonzero()[:,0]
         #     shifts = [ii[use_i,] for ii in shifts]
-        #     i = [ii[use_i,] for ii in i]
+        #     i = [ii[use_i,].to(im.device) for ii in i]
             
             
         #     sample = im[i]
         #     features = fs.compute_features_batch(sample[:,0], obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode)
         #     # features = fs.compute_features_miso_batch(aaa[:,0].transpose(0,1), miso_matrix, obs_dim=self.obs_dim, window_size=self.feat_dim, pad_mode=self.pad_mode) #use miso functions
             
-        #     predictions = torch.Tensor(self.model.predict_on_batch(features.cpu().numpy()))
-        #     center_i = [shifts[j+2].squeeze() for j in range(d)]
+        #     predictions = torch.Tensor(self.model.predict_on_batch(features.cpu().numpy())).to(im.device)
+        #     center_i = [shifts[j+2].squeeze().to(im.device) for j in range(d)]
         #     act_i = torch.argmax(predictions, dim=1)
         #     act_i = fs.unflatten_index(act_i, features.shape[1:])
         #     act_i = [(act_i[j] + center_i[j] - int(self.act_dim/2))% s[j] for j in range(d)]
-        #     tmp = np.zeros(i[0].shape[0])
+        #     tmp = torch.zeros(i[0].shape[0]).long().to(im.device)
         #     im_next[[tmp,tmp,]+center_i] = im[[tmp,tmp,]+act_i]
         
         return im_next

@@ -14,7 +14,7 @@ import functions as fs
 
 # trainset = './data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5'
 
-# trainset = './data/trainset_spparks_sz(93x93x93)_ng(256-256)_nsets(200)_future(4)_max(50)_kt(0.66)_freq(0.5)_cut(0).h5'
+# # trainset = './data/trainset_spparks_sz(93x93x93)_ng(256-256)_nsets(200)_future(4)_max(50)_kt(0.66)_freq(0.5)_cut(0).h5'
 # fs.train_primme(trainset, 100, batch_size=10000, reg=1, if_plot=True)
 
 
@@ -31,8 +31,8 @@ fs.compute_grain_stats(fp_primme)
 
 fps = ['./data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5',
        './data/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5']
-fs.compute_grain_stats(fps)
-fs.make_videos(fp_primme) #saves to 'plots'
+# fs.compute_grain_stats(fps)
+# fs.make_videos(fp_primme) #saves to 'plots'
 fs.make_time_plots(fps) 
 
 
