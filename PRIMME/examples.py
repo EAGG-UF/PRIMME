@@ -14,8 +14,31 @@ import functions as fs
 
 
 ### Train PRIMME using the above training set from SPPARKS
-# trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
-# model_location = fs.train_primme(trainset_location, num_eps=1, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=True)
+trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
+model_location = fs.train_primme(trainset_location, num_eps=100, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=True)
+
+
+
+
+import h5py
+fp ='./data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5'
+with h5py.File(fp, 'r') as f:
+    ic = f['sim0/ims_id'][0,0,].astype(int)
+    ea = f['sim0/euler_angles'][:]
+
+model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(100)_kt(0.66)_cut(0).h5"
+ims_id, fp_primme = fs.run_primme(ic, ea, nsteps=1000, modelname=model_location, pad_mode='circular', if_plot=False)
+fs.compute_grain_stats(fp_primme)
+
+
+fps = ['./data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5',
+       './data/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5']
+# fs.compute_grain_stats(fps)
+# fs.make_videos(fp_primme) #saves to 'plots'
+fs.make_time_plots(fps) 
+
+
+
 
 
 ### VALIDATION

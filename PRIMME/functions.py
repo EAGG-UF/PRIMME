@@ -32,8 +32,8 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-# device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
-device=torch.device("cpu")
+device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+# device=torch.device("cpu")
 
 
 
@@ -1390,12 +1390,12 @@ def compute_grain_stats(hps, gps='last', device=device):
                 g['ims_miso_spparks_avg'] = ims_miso_spparks_avg
                 print('Calculated: ims_miso_spparks_avg')
                 
-            # Find dihedral angle standard deviation
-            if 'dihedral_std' not in g.keys():
-                func = find_dihedral_stats
-                dihedral_std = iterate_function(d, func)
-                g['dihedral_std'] = dihedral_std
-                print('Calculated: dihedral_std')
+            # # Find dihedral angle standard deviation
+            # if 'dihedral_std' not in g.keys():
+            #     func = find_dihedral_stats
+            #     dihedral_std = iterate_function(d, func)
+            #     g['dihedral_std'] = dihedral_std
+            #     print('Calculated: dihedral_std')
             
             # # Find grain aspect ratios
             # if 'aspects' not in g.keys():
@@ -1718,38 +1718,38 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     plt.savefig('./plots/avg_miso_spparks_time_scaled', dpi=300)
     if if_show: plt.show()
     
-    # Plot dihedral angle distribution standard deviation over time
-    log = []
-    for i in tqdm(range(len(hps)),'Plotting dihedral angle STD'):
-        with h5py.File(hps[i], 'r') as f: 
-            dihedral_std = f[gps[i]+'/dihedral_std'][:]
-        log.append(dihedral_std)
+    # # Plot dihedral angle distribution standard deviation over time
+    # log = []
+    # for i in tqdm(range(len(hps)),'Plotting dihedral angle STD'):
+    #     with h5py.File(hps[i], 'r') as f: 
+    #         dihedral_std = f[gps[i]+'/dihedral_std'][:]
+    #     log.append(dihedral_std)
     
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(log[i], c=c[i%len(c)])
-        legend.append('')
-    plt.title('Dihedral angle distribution STD')
-    plt.xlabel('Number of frames')
-    plt.ylabel('STD (degrees)')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/dihedral_std', dpi=300)
-    if if_show: plt.show()
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(log[i], c=c[i%len(c)])
+    #     legend.append('')
+    # plt.title('Dihedral angle distribution STD')
+    # plt.xlabel('Number of frames')
+    # plt.ylabel('STD (degrees)')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/dihedral_std', dpi=300)
+    # if if_show: plt.show()
     
-    # Plot scaled dihedral angle distribution standard deviation over time
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
-        plt.xlim([np.max(xs[i]), np.min(xs[i])])
-        legend.append('')
-    plt.title('Dihedral angle distribution STD (scaled)')
-    plt.xlabel('Number of grains')
-    plt.ylabel('STD (degrees)')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/dihedral_std_scaled', dpi=300)
-    if if_show: plt.show()
+    # # Plot scaled dihedral angle distribution standard deviation over time
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
+    #     plt.xlim([np.max(xs[i]), np.min(xs[i])])
+    #     legend.append('')
+    # plt.title('Dihedral angle distribution STD (scaled)')
+    # plt.xlabel('Number of grains')
+    # plt.ylabel('STD (degrees)')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/dihedral_std_scaled', dpi=300)
+    # if if_show: plt.show()
     
     # #vizualize the relationship between area change and number of sides
     # i=1

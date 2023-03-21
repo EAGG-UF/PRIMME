@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 
 # Setup gpu access
 import tensorflow as tf
-# physical_devices = tf.config.list_physical_devices('GPU')
-# tf.config.set_visible_devices(physical_devices[0], 'GPU') 
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.set_visible_devices(physical_devices[4], 'GPU') 
+device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 
 class PRIMME:
