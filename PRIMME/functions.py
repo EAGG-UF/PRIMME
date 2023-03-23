@@ -16,7 +16,6 @@ import torch.nn.functional as F
 import imageio
 import matplotlib.pyplot as plt
 from unfoldNd import unfoldNd 
-from PRIMME import PRIMME
 import matplotlib.colors as mcolors
 # from uvw import RectilinearGrid, DataArray
 
@@ -32,7 +31,7 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-device=torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
+device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 # device=torch.device("cpu")
 
 
@@ -1621,7 +1620,7 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
         i = (ng<tg).argmax()
         ga = grain_areas[i]
         gr = np.sqrt(ga/np.pi)
-        bins=np.linspace(0,3,10)
+        bins=np.linspace(0,3,20)
         gr_dist, _ = np.histogram(gr[gr!=0]/gr[gr!=0].mean(), bins)
         plt.plot(bins[:-1], gr_dist/gr_dist.sum()/bins[1])
     plt.title('Normalized radius distribution (%d%% grains remaining)'%(100*frac))
@@ -1642,9 +1641,16 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
         ng = (grain_areas!=0).sum(1)
         i = (ng<tg).argmax()
         gs = grain_sides[i]
-        bins=np.linspace(0,3,10)
-        gs_dist, _ = np.histogram(gs[gs!=0]/np.mean(gs[gs!=0]), bins)
-        plt.plot(bins[1:]-0.5, gs_dist/gs_dist.sum())
+        # bins=np.linspace(0,3,20)
+        # gs_dist, _ = np.histogram(gs[gs!=0]/np.mean(gs[gs!=0]), bins)
+        # plt.plot(bins[1:]-0.5, gs_dist/gs_dist.sum())
+        
+        bins=np.linspace(0,12,10)
+        gs_dist, _ = np.histogram(gs[gs!=0], bins)
+        plt.plot(bins[1:]-0.5, gs_dist)
+        
+        
+        
     plt.title('Normalized number of sides distribution (%d%% grains remaining)'%(100*frac))
     plt.xlabel('S/<S>')
     plt.ylabel('Frequency')
@@ -2255,8 +2261,24 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
 def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
     energy_labels = compute_energy_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     action_labels = compute_action_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
+    
+    # action_labels = my_normalize(action_labels)
+   
     labels = action_labels + reg*energy_labels
+    
+    
+    # labels = (labels+reg)/(reg+1)
+    
+    # labels = my_normalize(labels)
+    
     return labels
+
+
+def my_normalize(data):
+    mi = torch.min(data)
+    ma = torch.max(data)
+    return (data-mi)/(ma-mi)
+    
 
 
 def compute_features(im, obs_dim=9, pad_mode='circular'):
@@ -2348,75 +2370,3 @@ def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
     # local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
     features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
     return features
-
-
-
-
-
-def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
-    
-    with h5py.File(trainset, 'r') as f: dims = len(f['ims_id'].shape)-3
-    append_name = trainset.split('_kt')[1]
-    modelname = "./data/model_dim(%d)_sz(%d_%d)_lr(%.0e)_reg(%d)_ep(%d)_kt%s"%(dims, obs_dim, act_dim, lr, reg, num_eps, append_name)
-    agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, reg=reg, num_dims=dims)
-    
-    for _ in tqdm(range(num_eps), desc='Epochs', leave=True):
-        agent.sample_data(trainset, batch_size=1)
-        agent.train()
-        if if_plot: agent.plot()
-        agent.save(modelname)
-    
-    return modelname
-
-
-def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', if_plot=False):
-    
-    # Setup
-    agent = PRIMME()
-    agent.load(modelname)
-    agent.pad_mode = pad_mode
-    im = torch.Tensor(ic).unsqueeze(0).unsqueeze(0).float().to(agent.device)
-    size = ic.shape
-    dims = len(size)
-    ngrain = len(torch.unique(im))
-    tmp = np.array([8,16,32], dtype='uint64')
-    dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
-    if np.all(miso_array==None): miso_array = find_misorientation(ea, mem_max=1) 
-    miso_matrix = miso_array_to_matrix(torch.from_numpy(miso_array[None,]))[0]
-    append_name = modelname.split('_kt')[1]
-    sz_str = ''.join(['%dx'%i for i in size])[:-1]
-    fp_save = './data/primme_sz(%s)_ng(%d)_nsteps(%d)_freq(1)_kt%s'%(sz_str,ngrain,nsteps,append_name)
-    
-    # Run simulation
-    ims_id = im
-    for _ in tqdm(range(nsteps), 'Running PRIMME simulation: '):
-        im = agent.step(im.clone(), miso_matrix[None,].to(agent.device), evaluate=False)
-        ims_id = torch.cat([ims_id, im])
-        if if_plot: 
-            if dims==2: 
-                plt.imshow(im[0,0,].cpu()); plt.show()
-            else: 
-                m = int(size[0]/2)
-                plt.imshow(im[0,0,m].cpu()); plt.show()
-            
-    ims_id = ims_id.cpu().numpy()
-    
-    # Save Simulation
-    with h5py.File(fp_save, 'a') as f:
-        
-        # If file already exists, create another group in the file for this simulaiton
-        num_groups = len(f.keys())
-        hp_save = 'sim%d'%num_groups
-        g = f.create_group(hp_save)
-        
-        # Save data
-        dset = g.create_dataset("ims_id", shape=ims_id.shape, dtype=dtype)
-        dset2 = g.create_dataset("euler_angles", shape=ea.shape)
-        dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
-        dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
-        dset[:] = ims_id
-        dset2[:] = ea
-        dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
-        dset4[:] = miso_matrix #same values as mis0_array, different format
-
-    return ims_id, fp_save
