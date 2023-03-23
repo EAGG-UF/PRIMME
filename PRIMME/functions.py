@@ -73,7 +73,7 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
 def my_batch(data, func, batch_sz=100):
         #'data' is broken into a list of "batch_sz" data along dim=0
         #"func" is then applied along dim=1 and concatenated back together
-        data_split = data.split(batch_sz, dmi=0)
+        data_split = data.split(batch_sz, dim=0)
         data_list = [func(d, dim=1) for d in data_split]
         return torch.cat(data_list)  
     
