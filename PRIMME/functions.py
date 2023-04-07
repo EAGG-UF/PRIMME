@@ -70,20 +70,65 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
 
 
 def my_batch(data, func, batch_sz=100):
-        #'data' is broken into a list of "batch_sz" data along dim=0
-        #"func" is then applied along dim=1 and concatenated back together
-        data_split = data.split(batch_sz, dmi=0)
-        data_list = [func(d, dim=1) for d in data_split]
-        return torch.cat(data_list)  
+    #'data' is broken into a list of "batch_sz" data along dim=0
+    #"func" is then applied along dim=1 and concatenated back together
+    data_split = data.split(batch_sz, dim=0)
+    data_list = [func(d, dim=1) for d in data_split]
+    return torch.cat(data_list)  
     
     
 def batch_where(data, batch_sz=100):
     #'data' is broken into a list of "batch_sz" data along dim=0
     #"func" is then applied along dim=1 and concatenated back together
-    data_split = data.split(batch_sz, 0)
+    data_split = data.split(batch_sz, dim=0)
     data_list = [torch.where(d) for d in data_split]
     data_list2 = [torch.stack((i+k*batch_sz,j)) for k, (i, j) in enumerate(data_list)]
     return torch.cat(data_list2, 1)
+
+
+def wrap_slice(data, slices_txt):
+    #Slices 'data' using 'slices_txt' (i.e. data[slices_txt])
+    #Except - Slices can wrap around boundaries using this function
+    #Note - 'data' can be an h5 dataset link
+    
+    # Setup
+    sz = np.array(data.shape)
+    
+    # Parse 'slices_txt' 
+    dims_remove = []
+    slices = slices_txt.replace(' ','').split(',')
+    for i, s in enumerate(slices): 
+        if ':' not in s: #if only int given, keep as is, but keep the dimension until the end
+            plus_one = int(s)+1
+            if plus_one==0: slices[i] = [s+':'] 
+            else: slices[i] = [s+':'+str(plus_one)] 
+            dims_remove.append(i)
+        else:
+            ss = s.split(':')
+            for j in range(2): 
+                if ss[j]!='': ss[j] = int(ss[j])%sz[i] #wrap all indices
+            if '' not in ss and ss[0]>ss[1]:
+                slices[i] = [str(ss[0])+':', ':'+str(ss[1])] #split indices when wraping
+            else:
+                slices[i] = [str(ss[0])+':'+str(ss[1])] #don't split when not wrapping
+    
+    # Find number of ranges needed for each dimension
+    num_iter = torch.Tensor([len(e) for e in slices]).long() 
+
+    # Create a nested list to hold blocks of data
+    log = []
+    for t in num_iter.flip(0): log = [log for _ in range(t)]
+    log = eval(str(log)) #ensure all the lists are unique objects
+    
+    # Extract, nest, and then block the data
+    i = torch.stack(torch.meshgrid([torch.arange(e) for e in num_iter])).reshape(len(num_iter), -1).T
+    for j in i: 
+        list_index = ''.join(['[%d]'%jj for jj in j])
+        slices_select = tuple([slices[k][j[k]] for k in range(len(slices))])
+        slices_select = ''.join(['%s,',]*len(slices))[:-1]%slices_select
+        exec('log%s = data[%s]'%(list_index, slices_select))
+        
+    return np.block(log).squeeze(tuple(dims_remove))
 
 
 
@@ -204,7 +249,7 @@ def voronoi2image(size=[128, 64, 32], ngrain=512, memory_limit=1e9, p=2, center_
     num_batches = torch.ceil(batch_memory/available_memory).int()
     num_dim_batch = torch.ceil(num_batches**(1/dim)).int() #how many batches per dimension
     dim_batch_size = torch.ceil(torch.Tensor(size)/num_dim_batch).int() #what's the size of each of the batches (per dimension)
-    num_dim_batch = torch.ceil(torch.Tensor(size)/dim_batch_size).int() #the actual number of batches per dimension (needed because of rouning error)
+    num_dim_batch = torch.ceil(torch.Tensor(size)/dim_batch_size).int() #the actual number of batches per dimension (needed because of rounding error)
     
     if available_memory>0: #if there is avaiable memory
         #CALCULATE THE ID IMAGE
@@ -637,6 +682,9 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
 
     # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
     m = np.max(ngrains_rng)
+    
+    # m = 2 #!!! remove later
+    
     tmp = np.array([8,16,32], dtype='uint64')
     dtype = 'uint' + str(tmp[np.sum(m>2**tmp)])
     
@@ -658,8 +706,11 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             
             # RUN SIMULATION
             im, ea, _ = voronoi2image(size, ngrains) #generate initial condition
+            
+            # im, ea = generate_circleIC(size, r=ngrains) #!!! remove later
+            
             miso_array = find_misorientation(ea, mem_max=1) 
-            run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=del_sim, path_sim=path_sim)
+            run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=del_sim, path_sim=path_sim, num_processors=32)
             grain_ID_images, grain_euler_angles, ims_energy = process_dump('%s/spparks.dump'%path_sim)
             # miso = np.loadtxt('%s/Miso.txt'%path_sim)*cutoff/180*np.pi #convert to radians
             
@@ -667,7 +718,10 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             dset[i,] = grain_ID_images[-(future_steps+1):,] 
             dset1[i,] = ims_energy[-(future_steps+1):,] 
             dset2[i,:ngrains,] = grain_euler_angles
-            dset3[i:int(ngrains*(ngrains-1)/2),] = miso_array
+            dset3[i,:int(ngrains*(ngrains-1)/2),] = miso_array
+            
+            # dset2[i,:] = grain_euler_angles #!!! remove later
+            # dset3[i,:] = miso_array #!!! remove later
             
     if del_sim: os.system(r"rm -r %s"%path_sim) #remove entire folder
     
@@ -1617,12 +1671,12 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
             grain_areas = f[gps[i]+'/grain_areas'][:]
         tg = (grain_areas.shape[1])*frac
         ng = (grain_areas!=0).sum(1)
-        i = (ng<tg).argmax()
-        ga = grain_areas[i]
+        j = (ng<tg).argmax()
+        ga = grain_areas[j]
         gr = np.sqrt(ga/np.pi)
         bins=np.linspace(0,3,20)
         gr_dist, _ = np.histogram(gr[gr!=0]/gr[gr!=0].mean(), bins)
-        plt.plot(bins[:-1], gr_dist/gr_dist.sum()/bins[1])
+        plt.plot(bins[1:]-0.5*(bins[1]-bins[0]), gr_dist/gr_dist.sum()/bins[1])
     plt.title('Normalized radius distribution (%d%% grains remaining)'%(100*frac))
     plt.xlabel('R/<R>')
     plt.ylabel('Frequency')
@@ -1639,23 +1693,23 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
             grain_sides = f[gps[i]+'/grain_sides'][:]
         tg = (grain_areas.shape[1])*frac
         ng = (grain_areas!=0).sum(1)
-        i = (ng<tg).argmax()
-        gs = grain_sides[i]
-        # bins=np.linspace(0,3,20)
-        # gs_dist, _ = np.histogram(gs[gs!=0]/np.mean(gs[gs!=0]), bins)
-        # plt.plot(bins[1:]-0.5, gs_dist/gs_dist.sum())
+        j = (ng<tg).argmax()
+        gs = grain_sides[j]
         
-        bins=np.linspace(0,12,10)
+        if i==0: #set histogram limits base on first set
+            low = np.min(gs[gs!=0])-1
+            high = np.max(gs[gs!=0])+1
+            if high>30: high=30
+        
+        bins=np.arange(low,high+2)-0.5
         gs_dist, _ = np.histogram(gs[gs!=0], bins)
         plt.plot(bins[1:]-0.5, gs_dist)
         
-        
-        
-    plt.title('Normalized number of sides distribution (%d%% grains remaining)'%(100*frac))
-    plt.xlabel('S/<S>')
+    plt.title('Number of sides distribution (%d%% grains remaining)'%(100*frac))
+    plt.xlabel('Number of sides')
     plt.ylabel('Frequency')
     if legend==True: plt.legend(legend)
-    plt.savefig('./plots/normalized_number_sides_distribution', dpi=300)
+    plt.savefig('./plots/number_sides_distribution', dpi=300)
     if if_show: plt.show()
         
     # Plot average misorientation per bounday pixel
@@ -1784,6 +1838,49 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     
     print(si)
     if not if_show: plt.close('all')
+    
+
+def circle_stats(fp):
+
+    with h5py.File(fp, 'a') as f:
+        ims = f['sim0/ims_id'][:]
+        areas = ims.sum(1).sum(1).sum(1)
+        f['sim0/circle_area'] = areas
+        
+        
+def circle_videos(fp):
+    
+    with h5py.File(fp, 'r') as f:
+        areas = f['sim0/circle_area'][:]
+        ims = f['sim0/ims_id'][:]
+        s = f['sim0/ims_id'].shape[2:]
+    
+    i_mid_growth = int(np.argmin(areas)/2)
+    im_mid_growth = ims[i_mid_growth,0]
+    plt.figure()
+    plt.imshow(im_mid_growth)
+    plt.title('Frame: %d'%i_mid_growth)
+    plt.savefig('./plots/circle_mid_growth_%dx%d'%s, dpi=300)
+    
+    ims = (255/np.max(ims)*ims).astype(np.uint8)
+    imageio.mimsave('./plots/ims_circle_%dx%d.mp4'%s, ims[:,0])
+    imageio.mimsave('./plots/ims_circle_%dx%d.gif'%s, ims[:,0])
+        
+
+def circle_plots(fps):
+    
+    if type(fps) is not list: fps = [fps]
+    
+    plt.figure()
+    for fp in fps:
+        with h5py.File(fp, 'r') as f:
+            areas = f['sim0/circle_area'][:]
+            s = f['sim0/ims_id'].shape[2:]
+        plt.plot(areas)
+    plt.title('Circle area over time')
+    plt.xlabel('Frames')
+    plt.ylabel('Circle Aera')
+    plt.savefig('./plots/circle_area_over_time_%dx%d'%s, dpi=300)
 
 
 
@@ -2224,7 +2321,7 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     size = im_seq.shape[1:]
     energy_changes = []
     for i in range(im_seq.shape[0]-1):
-        ims_curr = im_seq[i].unsqueeze(0)
+        ims_curr = im_seq[i].unsqueeze(0) 
         ims_next = im_seq[i+1].unsqueeze(0)
         energy_change = compute_action_energy_change(ims_curr, ims_next, act_dim=act_dim, pad_mode=pad_mode)
         energy_changes.append(energy_change)
@@ -2238,11 +2335,19 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     return energy_labels
 
 
+def compute_energy_labels2(im_seq, act_dim=9, energy_dim=3, pad_mode="circular"):
+    window_act = my_unfoldNd(im_seq[0:1,], kernel_size=act_dim, pad_mode=pad_mode)[0]
+    window_act2 = my_unfoldNd(im_seq[0:1,], kernel_size=energy_dim, pad_mode=pad_mode)[0]
+    tmp = (window_act2[None,]==window_act[:,None,]).permute(2,1,0)
+    energy_labels = my_batch(tmp, torch.sum, batch_sz=100).reshape(-1,17,17)/(energy_dim**2)
+    return energy_labels.to(im_seq.device)
+
+
 def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     #Label which actions in each action window were actually taken between the first image and all following
     #The total energy label is a decay sum of those action labels
 
-    size = im_seq.shape[1:]
+    sz = im_seq.shape
     im = im_seq[0:1,]
     ims_next = im_seq[1:]
     
@@ -2250,10 +2355,10 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     window_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)[0]
     ims_next_flat = ims_next.view(ims_next.shape[0], -1)
     
-    actions_marked = window_act.unsqueeze(0).expand(4,-1,-1)==ims_next_flat.unsqueeze(1) #Mark the actions that matches each future image (the "action taken")
+    actions_marked = window_act.unsqueeze(0).expand(sz[0]-1,-1,-1)==ims_next_flat.unsqueeze(1) #Mark the actions that matches each future image (the "action taken")
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(-1,1,1).to(im.device)
-    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((np.product(size),)+(act_dim,)*(len(size)-1))
+    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((np.product(sz[1:]),)+(act_dim,)*(len(sz)-2))
     
     return action_labels
 
@@ -2264,7 +2369,12 @@ def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
     
     # action_labels = my_normalize(action_labels)
    
+    
+   
+    
     labels = action_labels + reg*energy_labels
+    
+    
     
     
     # labels = (labels+reg)/(reg+1)

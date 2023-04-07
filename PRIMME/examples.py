@@ -5,29 +5,33 @@ IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
     Yan, W., Melville, J., Yadav, V., Everett, K., Yang, L., Kesler, M. S., ... & Harley, J. B. (2022). A novel physics-regularized interpretable machine learning model for grain growth. Materials & Design, 222, 111032.
 """
 
+
+
+
+
 ### Import functions
 import functions as fs
 import PRIMME as fsp
 
 
+
+fp = './data/sims/spparks_sz(512x512)_ng(2)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5'
+fs.circle_videos(fp)
+fs.circle_plots(fp)
+
+
 ### Create training set by running SPPARKS
-# trainset_location = fs.create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=0.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4)
+# trainset_location = fs.create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4)
 
 
-### Train PRIMME using the above training set from SPPARKS
-trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
+# ### Train PRIMME using the above training set from SPPARKS
+# trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
+trainset_location = "./data/trainset_spparks_sz(257x257)_r(32-96)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
 model_location = fsp.train_primme(trainset_location, num_eps=1000, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", plot_freq=100)
 
 
 
-
-
-
-
-
-
-
-
+#Polcrystalline 
 import h5py
 fp ='./data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0)_old.h5'
 with h5py.File(fp, 'r') as f:
@@ -38,11 +42,60 @@ model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(1000)_kt(0.6
 ims_id, fp_primme = fsp.run_primme(ic, ea, nsteps=1000, modelname=model_location, pad_mode='circular', plot_freq=50)
 fs.compute_grain_stats(fp_primme)
 fs.make_videos(fp_primme) #saves to 'plots'
+fs.make_time_plots(fp_primme) 
 
 
-fps = ['./data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5',
-        './data/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5']
-fs.make_time_plots(fps) 
+#Small circle
+ic, ea = fs.generate_circleIC(size=[256,256], r=64)
+_, fp_primme = fsp.run_primme(ic, ea, nsteps=500, modelname=model_location, pad_mode='circular', plot_freq=50)
+fs.circle_stats(fp_primme)
+fs.circle_videos(fp_primme)
+fs.circle_plots(fp_primme)
+
+
+#Large circle
+ic, ea = fs.generate_circleIC(size=[512,512], r=200)
+_, fp_primme = fsp.run_primme(ic, ea, nsteps=1000, modelname=model_location, pad_mode='circular', plot_freq=50)
+fs.circle_stats(fp_primme)
+fs.circle_videos(fp_primme)
+fs.circle_plots(fp_primme)
+
+
+
+
+
+
+# fps = ['./data/sims/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5',
+#         './data/sims/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0)_19.h5',
+#         './data/sims/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0)_20.h5']
+# fs.make_time_plots(fps) 
+
+
+
+
+
+
+
+# fps = ['./data/sims/spparks_sz(512x512)_ng(2)_nsteps(1000)_freq(1.0)_kt(0.66)_cut(0).h5',
+#         './data/sims/primme_sz(512x512)_ng(2)_nsteps(1000)_freq(1)_kt(0.66)_cut(0)_20.h5']
+# fs.circle_plots(fps)
+
+
+
+
+
+# fps = ['./data/sims/spparks_sz(256x256)_ng(2)_nsteps(500)_freq(1.0)_kt(0.66)_cut(0).h5',
+#         './data/sims/primme_sz(256x256)_ng(2)_nsteps(500)_freq(1)_kt(0.66)_cut(0)_0.h5']
+# fs.circle_plots(fps)
+
+
+
+
+
+
+
+
+
 
 
 
@@ -68,9 +121,9 @@ fs.make_time_plots(fps)
 
 
 ## Run SPPARKS model
-fp_spparks = fs.run_spparks(ic, ea, nsteps=1000, kt=0.66, cut=0.0)
-fs.compute_grain_stats(fp_spparks) 
-fs.make_videos(fp_spparks) #saves to 'plots'
+# fp_spparks = fs.run_spparks(ic, ea, nsteps=1000, kt=0.66, cut=0.0)
+# fs.compute_grain_stats(fp_spparks) 
+# fs.make_videos(fp_spparks) #saves to 'plots'
 # fs.make_time_plots(fp_spparks) #saves to 'plots'
 
 

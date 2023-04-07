@@ -45,6 +45,38 @@ class PRIMME(nn.Module):
         self.BatchNorm1 = nn.BatchNorm1d(21 * 21 * 4)
         self.BatchNorm2 = nn.BatchNorm1d(21 * 21 * 2)
         self.BatchNorm3 = nn.BatchNorm1d(21 * 21)
+        
+        
+        # n = self.obs_dim ** self.num_dims
+        # self.f1 = nn.Linear(n, int(n*0.6))
+        # self.f2 = nn.Linear(int(n*0.6), int(n*0.2))
+        # self.f3 = nn.Linear(int(n*0.2), int(n*0.6))
+        # self.f4 = nn.Linear(int(n*0.6), self.act_dim ** self.num_dims)
+        # self.dropout = nn.Dropout(p = 0.25) 
+        # self.BatchNorm1 = nn.BatchNorm1d(int(n*0.6))
+        # self.BatchNorm2 = nn.BatchNorm1d(int(n*0.2))
+        # self.BatchNorm3 = nn.BatchNorm1d(int(n*0.6))
+        
+        
+        # n0 = self.obs_dim ** self.num_dims
+        # n = 21*21
+        # self.f1 = nn.Linear(n0, int(n*4))
+        # self.f11 = nn.Linear(int(n*4), int(n*3))
+        # self.f2 = nn.Linear(int(n*3), int(n*2))
+        # self.f22 = nn.Linear(int(n*2), int(n*1))
+        # self.f3 = nn.Linear(int(n*1), int(n*0.5))
+        # self.f33 = nn.Linear(int(n*0.5), int(n*0.5))
+        # self.f4 = nn.Linear(int(n*0.5), self.act_dim ** self.num_dims)
+        # self.dropout = nn.Dropout(p = 0.25) 
+        # self.BatchNorm1 = nn.BatchNorm1d(int(n*4))
+        # self.BatchNorm11 = nn.BatchNorm1d(int(n*3))
+        # self.BatchNorm2 = nn.BatchNorm1d(int(n*2))
+        # self.BatchNorm22 = nn.BatchNorm1d(int(n*1))
+        # self.BatchNorm3 = nn.BatchNorm1d(int(n*0.5))
+        # self.BatchNorm33 = nn.BatchNorm1d(int(n*0.5))
+        
+        
+        
 
         # DEFINE NEURAL NETWORK OPTIMIZATION
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)#, weight_decay=1e-5)
@@ -59,18 +91,42 @@ class PRIMME(nn.Module):
         #   Outputs--
         #       y: "action likelihood" for the center pixel to flip to each the grain associated with each other pixel
         
-        h1 = F.relu(self.f1(x))
-        out = self.dropout(h1)   
+        out = F.relu(self.f1(x))
+        out = self.dropout(out)   
         out = self.BatchNorm1(out)
-        h2 = F.relu(self.f2(out))
-        out = self.dropout(h2)
+        out = F.relu(self.f2(out))
+        out = self.dropout(out)
         out = self.BatchNorm2(out)
-        h3 = F.relu(self.f3(out))
-        out = self.dropout(h3)
+        out = F.relu(self.f3(out))
+        out = self.dropout(out)
         out = self.BatchNorm3(out)
         # y  = torch.sigmoid(self.f4(out))
-        
         y  = torch.relu(self.f4(out))
+        
+        
+        
+        # out = F.relu(self.f1(x))
+        # out = self.dropout(out)   
+        # out = self.BatchNorm1(out)
+        # out = F.relu(self.f11(out))
+        # out = self.dropout(out)   
+        # out = self.BatchNorm11(out)
+        # out = F.relu(self.f2(out))
+        # out = self.dropout(out)
+        # out = self.BatchNorm2(out)
+        # out = F.relu(self.f22(out))
+        # out = self.dropout(out)
+        # out = self.BatchNorm22(out)
+        # out = F.relu(self.f3(out))
+        # out = self.dropout(out)
+        # out = self.BatchNorm3(out)
+        # out = F.relu(self.f33(out))
+        # out = self.dropout(out)
+        # out = self.BatchNorm33(out)
+        # # y  = torch.sigmoid(self.f4(out))
+        # y  = torch.relu(self.f4(out))
+        
+        
         
         return y
     
@@ -86,10 +142,12 @@ class PRIMME(nn.Module):
             i_train = np.sort(np.random.randint(low=0, high=i_split, size=(1,)))
             batch = f['ims_id'][i_train,]
             miso_array = f['miso_array'][i_train,] 
+            miso_array = miso_array[:, miso_array[0,]!=0] #cut out zeros, each starts with different number of grains
             
             i_val = np.sort(np.random.randint(low=i_split, high=i_max, size=(1,)))
             batch_val = f['ims_id'][i_val,]
             miso_array_val = f['miso_array'][i_val,] 
+            miso_array = miso_array[:, miso_array[0,]!=0] #cut out zeros, each starts with different number of grains
             
         self.im_seq = torch.from_numpy(batch[0,].astype(float)).to(device)
         miso_array = torch.from_numpy(miso_array.astype(float)).to(device)
@@ -100,11 +158,11 @@ class PRIMME(nn.Module):
         self.miso_matrix_val = fs.miso_array_to_matrix(miso_array)
         
         #Compute features
-        self.features = fs.compute_features_miso(self.im_seq[0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        self.features_val = fs.compute_features_miso(self.im_seq_val[0:1,], self.miso_matrix_val, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
-        
         # self.features = fs.compute_features(self.im_seq[0:1,], obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         # self.features_val = fs.compute_features(self.im_seq_val[0:1,], obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        
+        self.features = fs.compute_features_miso(self.im_seq[0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
+        self.features_val = fs.compute_features_miso(self.im_seq_val[0:1,], self.miso_matrix_val, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         
         #Compute labels
         self.labels = fs.compute_labels(self.im_seq, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
@@ -115,6 +173,9 @@ class PRIMME(nn.Module):
         
         
     def step(self, im, miso_matrix, evaluate=True):
+        
+        # self.eval()
+        
         # features = fs.compute_features(im, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         features = fs.compute_features_miso(im, miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode) #use miso functions
         mid_ix = (np.array(features.shape[1:])/2).astype(int)
@@ -132,8 +193,20 @@ class PRIMME(nn.Module):
         
         for e in features_split: 
             
+            #remove this later!!!!! added it to fix an error cause by a batch of 1, switch to self.eval() in the future
+            jjj=0
+            if e.shape[0]==1: 
+                jjj=1
+                e = e.repeat(2,1,1)
+            
+            
             with torch.no_grad():
                 predictions = self.forward(e.reshape(-1, self.obs_dim**self.num_dims))
+                
+            #remove this later!!!!!
+            if jjj:
+                predictions = predictions[0:1,]
+            
             
             action_values = torch.argmax(predictions, dim=1)
             
@@ -154,28 +227,32 @@ class PRIMME(nn.Module):
         return self.im_next
 
 
-    def compute_metrics(self, if_train):
+    def evaluate_model(self):
         
-        if if_train==True:
-            im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
-            im_next_actual = self.im_seq[1:2,]
-            accuracy = torch.mean((im_next_predicted==im_next_actual).float())
-            loss = self.loss_func(self.predictions, self.labels[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
-            
-            self.training_loss.append(loss)
-            self.training_acc.append(accuracy)
-            
-        else:
-            im_next_predicted = self.step(self.im_seq_val[0:1,], self.miso_matrix_val)
-            im_next_actual = self.im_seq_val[1:2,]
-            accuracy = torch.mean((im_next_predicted==im_next_actual).float())
-            loss = self.loss_func(self.predictions, self.labels_val[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
-            
-            self.validation_loss.append(loss)
-            self.validation_acc.append(accuracy)
+        # self.eval()
+        
+        #Training loss and accuracy
+        im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
+        im_next_actual = self.im_seq[1:2,]
+        accuracy = torch.mean((im_next_predicted==im_next_actual).float())
+        loss = self.loss_func(self.predictions, self.labels[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
+        
+        self.training_loss.append(loss)
+        self.training_acc.append(accuracy)
+        
+        #Validation loss and accuracy
+        im_next_predicted = self.step(self.im_seq_val[0:1,], self.miso_matrix_val)
+        im_next_actual = self.im_seq_val[1:2,]
+        accuracy = torch.mean((im_next_predicted==im_next_actual).float())
+        loss = self.loss_func(self.predictions, self.labels_val[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
+        
+        self.validation_loss.append(loss)
+        self.validation_acc.append(accuracy)
         
     
-    def train(self, evaluate=True):
+    def train_model(self):
+        
+        # self.train()
         
         features, labels = fs.unison_shuffled_copies(self.features, self.labels) #random shuffle 
         
@@ -183,21 +260,14 @@ class PRIMME(nn.Module):
         ind = tuple([slice(None)]) + tuple(mid_ix)
         indx_use = torch.nonzero(features[ind])[:,0]
         
-        features = features[indx_use,]
-        labels = labels[indx_use,]
+        features = features[indx_use,].reshape(-1, self.act_dim**self.num_dims)
+        labels = labels[indx_use,].reshape(-1, self.act_dim**self.num_dims)
         
-        outputs = self.forward(features.reshape(-1, self.act_dim**self.num_dims))
-        loss = self.loss_func(outputs, labels.reshape(-1, self.act_dim**self.num_dims))
+        outputs = self.forward(features)
+        loss = self.loss_func(outputs, labels)
         self.optimizer.zero_grad()  # Zero the gradient
         loss.backward()             # Perform backpropagation
         self.optimizer.step()       # Step with optimizer  
-        
-        if evaluate: 
-            self.compute_metrics(if_train=True)
-            self.compute_metrics(if_train=False)
-            
-        
-        return self.validation_loss[-1], self.validation_acc[-1]
         
     
     def plot(self, fp_results='./plots'):
@@ -205,13 +275,13 @@ class PRIMME(nn.Module):
         if self.num_dims==2:
             #Plot the next images, predicted and true, together
             fig, axs = plt.subplots(1,3)
-            axs[0].matshow(self.im_seq[0,0,].cpu().numpy())
+            axs[0].matshow(self.im_seq_val[0,0,].cpu().numpy())
             axs[0].set_title('Current')
             axs[0].axis('off')
             axs[1].matshow(self.im_next[0,0,].cpu().numpy()) 
             axs[1].set_title('Predicted Next')
             axs[1].axis('off')
-            axs[2].matshow(self.im_seq[1,0,].cpu().numpy()) 
+            axs[2].matshow(self.im_seq_val[1,0,].cpu().numpy()) 
             axs[2].set_title('True Next')
             axs[2].axis('off')
             plt.savefig('%s/sim_vs_true.png'%fp_results)
@@ -226,7 +296,7 @@ class PRIMME(nn.Module):
             axs[0].plot(ctr,ctr,marker='x')
             axs[0].set_title('Predicted')
             axs[0].axis('off')
-            p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0), vmin=0, vmax=1) 
+            p2 = axs[1].matshow(np.mean(self.labels_val.cpu().numpy(), axis=0), vmin=0, vmax=1) 
             fig.colorbar(p2, ax=axs[1])
             axs[1].plot(ctr,ctr,marker='x')
             axs[1].set_title('True')
@@ -239,34 +309,18 @@ class PRIMME(nn.Module):
             # plt.imshow(pred[i]); plt.show()
             # i+=100
             
-            
-            #Plot loss and accuracy
-            fig, axs = plt.subplots(1,2)
-            axs[0].plot(self.validation_loss, '-*', label='Validation')
-            axs[0].plot(self.training_loss, '--*', label='Training')
-            axs[0].set_title('Loss (%.3f)'%self.validation_loss[-1])
-            axs[0].legend()
-            axs[1].plot(self.validation_acc, '-*', label='Validation')
-            axs[1].plot(self.training_acc, '--*', label='Training')
-            axs[1].set_title('Accuracy (%.3f)'%self.validation_acc[-1])
-            axs[1].legend()
-            plt.savefig('%s/train_val_loss_accuracy.png'%fp_results)
-            plt.show()
-            
-            plt.close('all')
-        
         if self.num_dims==3:
             bi = int(self.im_seq.shape[-1]/2)
             
             #Plot the next images, predicted and true, together
             fig, axs = plt.subplots(1,3)
-            axs[0].matshow(self.im_seq[0,0,...,bi].cpu().numpy())
+            axs[0].matshow(self.im_seq_val[0,0,...,bi].cpu().numpy())
             axs[0].set_title('Current')
             axs[0].axis('off')
             axs[1].matshow(self.im_next[0,0,...,bi].cpu().numpy()) 
             axs[1].set_title('Predicted Next')
             axs[1].axis('off')
-            axs[2].matshow(self.im_seq[1,0,...,bi].cpu().numpy()) 
+            axs[2].matshow(self.im_seq_val[1,0,...,bi].cpu().numpy()) 
             axs[2].set_title('True Next')
             axs[2].axis('off')
             plt.savefig('%s/sim_vs_true.png'%fp_results)
@@ -281,7 +335,7 @@ class PRIMME(nn.Module):
             axs[0].plot(ctr,ctr,marker='x')
             axs[0].set_title('Predicted')
             axs[0].axis('off')
-            p2 = axs[1].matshow(np.mean(self.labels.cpu().numpy(), axis=0)[...,ctr], vmin=0, vmax=1) 
+            p2 = axs[1].matshow(np.mean(self.labels_val.cpu().numpy(), axis=0)[...,ctr], vmin=0, vmax=1) 
             fig.colorbar(p2, ax=axs[1])
             axs[1].plot(ctr,ctr,marker='x')
             axs[1].set_title('True')
@@ -289,20 +343,20 @@ class PRIMME(nn.Module):
             plt.savefig('%s/action_likelihood.png'%fp_results)
             plt.show()
             
-            #Plot loss and accuracy
-            fig, axs = plt.subplots(1,2)
-            axs[0].plot(self.validation_loss, '-*', label='Validation')
-            axs[0].plot(self.training_loss, '--*', label='Training')
-            axs[0].set_title('Loss')
-            axs[0].legend()
-            axs[1].plot(self.validation_acc, '-*', label='Validation')
-            axs[1].plot(self.training_acc, '--*', label='Training')
-            axs[1].set_title('Accuracy')
-            axs[1].legend()
-            plt.savefig('%s/train_val_loss_accuracy.png'%fp_results)
-            plt.show()
-            
-            plt.close('all')
+        #Plot loss and accuracy
+        fig, axs = plt.subplots(1,2)
+        axs[0].plot(self.validation_loss, '-*', label='Validation')
+        axs[0].plot(self.training_loss, '--*', label='Training')
+        axs[0].set_title('Loss (%.3f)'%np.min(self.validation_loss))
+        axs[0].legend()
+        axs[1].plot(self.validation_acc, '-*', label='Validation')
+        axs[1].plot(self.training_acc, '--*', label='Training')
+        axs[1].set_title('Accuracy (%.3f)'%np.max(self.validation_acc))
+        axs[1].legend()
+        plt.savefig('%s/train_val_loss_accuracy.png'%fp_results)
+        plt.show()
+        
+        plt.close('all')
         
     
     # def load(self, name):
@@ -330,15 +384,17 @@ def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_
     
     for i in tqdm(range(num_eps), desc='Epochs', leave=True):
         agent.sample_data(trainset)
-        val_loss, val_acc = agent.train()
+        agent.train_model()
+        agent.evaluate_model()
         
-        if plot_freq is not None: 
-            if i%plot_freq==0:
-                agent.plot()
-        
+        val_loss = agent.validation_loss[-1]
         if val_loss<best_validation_loss:
             best_validation_loss = val_loss
             agent.save(modelname)
+            
+        if plot_freq is not None: 
+            if i%plot_freq==0:
+                agent.plot()
     
     return modelname
 
