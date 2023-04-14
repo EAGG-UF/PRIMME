@@ -16,12 +16,12 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
+# device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 
 class PRIMME(nn.Module):
-    def __init__(self, obs_dim=17, act_dim=17, pad_mode="circular", learning_rate=5e-5, reg=1, num_dims=2, cfg='./cfg/dqn_setup.json'):
+    def __init__(self, obs_dim=17, act_dim=17, pad_mode='circular', learning_rate=5e-5, reg=1, num_dims=2, batch_dims=[257,257], cfg='./cfg/dqn_setup.json'):
         super(PRIMME, self).__init__()
         
         # self.device = device
@@ -31,6 +31,7 @@ class PRIMME(nn.Module):
         self.learning_rate = learning_rate
         self.reg = reg
         self.num_dims = num_dims
+        self.batch_dims = batch_dims
         self.training_loss = []
         self.validation_loss = []
         self.training_acc = []
@@ -136,18 +137,39 @@ class PRIMME(nn.Module):
         with h5py.File(h5_path, 'r') as f:
             i_max = f['ims_id'].shape[0]
             i_split = int(i_max*0.8)
-            i_train = np.sort(np.random.randint(low=0, high=i_split, size=(1,)))
-            i_val = np.sort(np.random.randint(low=0, high=i_split, size=(1,)))
+            i_train = np.random.randint(low=0, high=i_split)
+            i_val = np.random.randint(low=i_split, high=i_max)
+            s = f['ims_id'].shape[3:]
             
-            i_train = np.sort(np.random.randint(low=0, high=i_split, size=(1,)))
-            batch = f['ims_id'][i_train,]
-            miso_array = f['miso_array'][i_train,] 
+            r = [np.random.randint(0, s)[0] for e in s]
+            tmp = [str(r[j])+':'+str(r[j]+self.batch_dims[j]) for j in range(len(s))]
+            tmp = [str(i_train)]+[':']+[':']+tmp
+            slices_txt = tmp = ','.join(tmp)
+            batch = fs.wrap_slice(f['ims_id'], slices_txt)[None,]
+            miso_array = f['miso_array'][i_train,][None,]
             miso_array = miso_array[:, miso_array[0,]!=0] #cut out zeros, each starts with different number of grains
             
-            i_val = np.sort(np.random.randint(low=i_split, high=i_max, size=(1,)))
-            batch_val = f['ims_id'][i_val,]
-            miso_array_val = f['miso_array'][i_val,] 
-            miso_array = miso_array[:, miso_array[0,]!=0] #cut out zeros, each starts with different number of grains
+            r = [np.random.randint(0, s)[0] for e in s]
+            tmp = [str(r[j])+':'+str(r[j]+self.batch_dims[j]) for j in range(len(s))]
+            tmp = [str(i_val)]+[':']+[':']+tmp
+            slices_txt = tmp = ','.join(tmp)
+            batch_val = fs.wrap_slice(f['ims_id'], slices_txt)[None,]
+            miso_array_val = f['miso_array'][i_val,][None,]
+            miso_array_val = miso_array_val[:, miso_array_val[0,]!=0]
+            
+        # with h5py.File(h5_path, 'r') as f:
+        #     i_max = f['ims_id'].shape[0]
+        #     i_split = int(i_max*0.8)
+            
+        #     i_train = np.sort(np.random.randint(low=0, high=i_split, size=(1,)))
+        #     batch = f['ims_id'][i_train,]
+        #     miso_array = f['miso_array'][i_train,] 
+        #     miso_array = miso_array[:, miso_array[0,]!=0] #cut out zeros, each starts with different number of grains
+            
+        #     i_val = np.sort(np.random.randint(low=i_split, high=i_max, size=(1,)))
+        #     batch_val = f['ims_id'][i_val,]
+        #     miso_array_val = f['miso_array'][i_val,] 
+        #     miso_array_val = miso_array_val[:, miso_array_val[0,]!=0] #cut out zeros, each starts with different number of grains
             
         self.im_seq = torch.from_numpy(batch[0,].astype(float)).to(device)
         miso_array = torch.from_numpy(miso_array.astype(float)).to(device)
@@ -164,12 +186,27 @@ class PRIMME(nn.Module):
         self.features = fs.compute_features_miso(self.im_seq[0:1,], self.miso_matrix, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         self.features_val = fs.compute_features_miso(self.im_seq_val[0:1,], self.miso_matrix_val, obs_dim=self.obs_dim, pad_mode=self.pad_mode)
         
-        #Compute labels
+        # Compute labels
         self.labels = fs.compute_labels(self.im_seq, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
         self.labels_val = fs.compute_labels(self.im_seq_val, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
         
         # self.labels = fs.compute_labels_miso(self.im_seq, self.miso_matrix, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
         # self.labels_val = fs.compute_labels_miso(self.im_seq_val, self.miso_matrix_val, obs_dim=self.obs_dim, act_dim=self.act_dim, reg=self.reg, pad_mode=self.pad_mode)
+        
+        
+        
+        #delete later
+        # self.labels = self.labels.reshape(48,48,17,17)[3:-3,3:-3,:,:].reshape(-1,17,17) 
+        # self.labels_val = self.labels_val.reshape(48,48,17,17)[3:-3,3:-3,:,:].reshape(-1,17,17)
+        
+        
+        
+        #assumes 2d for now too, just update the "c"s later #!!!
+        t = int(np.sqrt(self.labels.shape[0]))
+        self.labels = self.labels.reshape(t,t,17,17)[3:-3,3:-3,:,:].reshape(-1,17,17) 
+        self.labels_val = self.labels_val.reshape(t,t,17,17)[3:-3,3:-3,:,:].reshape(-1,17,17) 
+        
+        
         
         
     def step(self, im, miso_matrix, evaluate=True):
@@ -184,6 +221,20 @@ class PRIMME(nn.Module):
         features = features[indx_use,]
         
         action_features = fs.my_unfoldNd(im, kernel_size=self.act_dim, pad_mode=self.pad_mode)[0,] 
+        
+        
+        
+        #delete later
+        # action_features = action_features.reshape(-1,48,48)[:,3:-3,3:-3].reshape(-1,42*42)
+        
+        
+        
+        #assumes 2d for now too, just update the "c"s later #!!!
+        t = int(np.sqrt(action_features.shape[-1]))
+        action_features = action_features.reshape(-1,t,t)[:,3:-3,3:-3].reshape(self.act_dim**2,-1)
+        
+        
+        
         action_features = action_features[...,indx_use]
         
         batch_size = 5000
@@ -219,9 +270,9 @@ class PRIMME(nn.Module):
         
         # self.im_next = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0)).reshape(im.shape)
         updated_values = torch.gather(action_features, dim=0, index=action_values.unsqueeze(0))[0,]
-        self.im_next = im.flatten().float()
-        self.im_next[indx_use] = updated_values
-        self.im_next = self.im_next.reshape(im.shape)
+        self.im_next = im[:,:,11:-11,11:-11].flatten().float() #!!!
+        self.im_next[indx_use] = updated_values.float()
+        self.im_next = self.im_next.reshape(1,1,42,42) #!!!
         self.indx_use = indx_use
         
         return self.im_next
@@ -233,7 +284,7 @@ class PRIMME(nn.Module):
         
         #Training loss and accuracy
         im_next_predicted = self.step(self.im_seq[0:1,], self.miso_matrix)
-        im_next_actual = self.im_seq[1:2,]
+        im_next_actual = self.im_seq[1:2,:,11:-11,11:-11] #!!!
         accuracy = torch.mean((im_next_predicted==im_next_actual).float())
         loss = self.loss_func(self.predictions, self.labels[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
         
@@ -242,7 +293,7 @@ class PRIMME(nn.Module):
         
         #Validation loss and accuracy
         im_next_predicted = self.step(self.im_seq_val[0:1,], self.miso_matrix_val)
-        im_next_actual = self.im_seq_val[1:2,]
+        im_next_actual = self.im_seq_val[1:2,:,11:-11,11:-11] #!!!
         accuracy = torch.mean((im_next_predicted==im_next_actual).float())
         loss = self.loss_func(self.predictions, self.labels_val[self.indx_use].reshape(-1, self.act_dim**self.num_dims)).item()
         

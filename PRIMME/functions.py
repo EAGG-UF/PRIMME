@@ -31,8 +31,8 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-# device=torch.device("cpu")
+# device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device=torch.device("cpu")
 
 
 
@@ -107,7 +107,7 @@ def wrap_slice(data, slices_txt):
             ss = s.split(':')
             for j in range(2): 
                 if ss[j]!='': ss[j] = int(ss[j])%sz[i] #wrap all indices
-            if '' not in ss and ss[0]>ss[1]:
+            if '' not in ss and ss[0]>=ss[1]:
                 slices[i] = [str(ss[0])+':', ':'+str(ss[1])] #split indices when wraping
             else:
                 slices[i] = [str(ss[0])+':'+str(ss[1])] #don't split when not wrapping
@@ -543,23 +543,24 @@ def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, m
 
 
 def read_dump_item(path_to_dump):
+    #Can't seek through file reliably, item IDs different length and inconsistent
+    
     with open(path_to_dump) as file: 
+        
         line = file.readline()
         item = line[6:].replace('\n', '')
         log = []
-        for line in file.readlines():
-            if 'ITEM:' in line:
+        # for line in file.readlines():
+        while line != '':
+            line = file.readline()
+            if 'ITEM:' in line or line=='':
                 data = np.stack(log)
                 yield item, data
                 item = line[6:].replace('\n', '')
                 log = []
-                
             else:
                 data_line = np.array(line.split()).astype(float)
                 log.append(data_line)
-        # Return final item
-        data = np.stack(log)
-        yield item, data
             
             
 def process_dump_item(path_to_dump):
@@ -682,9 +683,6 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
 
     # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
     m = np.max(ngrains_rng)
-    
-    # m = 2 #!!! remove later
-    
     tmp = np.array([8,16,32], dtype='uint64')
     dtype = 'uint' + str(tmp[np.sum(m>2**tmp)])
     
@@ -706,9 +704,6 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             
             # RUN SIMULATION
             im, ea, _ = voronoi2image(size, ngrains) #generate initial condition
-            
-            # im, ea = generate_circleIC(size, r=ngrains) #!!! remove later
-            
             miso_array = find_misorientation(ea, mem_max=1) 
             run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=del_sim, path_sim=path_sim, num_processors=32)
             grain_ID_images, grain_euler_angles, ims_energy = process_dump('%s/spparks.dump'%path_sim)
@@ -719,9 +714,6 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             dset1[i,] = ims_energy[-(future_steps+1):,] 
             dset2[i,:ngrains,] = grain_euler_angles
             dset3[i,:int(ngrains*(ngrains-1)/2),] = miso_array
-            
-            # dset2[i,:] = grain_euler_angles #!!! remove later
-            # dset3[i,:] = miso_array #!!! remove later
             
     if del_sim: os.system(r"rm -r %s"%path_sim) #remove entire folder
     
@@ -2294,12 +2286,42 @@ def compute_action_energy_change(im, im_next, energy_dim=3, act_dim=9, pad_mode=
     #The difference is the energy change
     #FUTURE WORK -> If I change how the num-neighbors function works, I could probably use expand instead of repeat
     
-    num_dims = len(im.shape)-2
+    num_dims = im.dim()-2
+    
+    
+    
+    
+    #delete later
+    # windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
+    # windows_curr_obs = windows_curr_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) 
+    # current_energy = num_diff_neighbors_inline(windows_curr_obs)
+    # windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
+    # windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
+    # windows_next_obs = windows_next_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1)
+    
+    
+    
+    
+    
+    #assumes pad_mode=None, but is actually circlular along all dimensions
+    #assumes 2d for now too, just update the "c"s later #!!!
+    
+    t = np.array(im.shape)
+    t[1] = int(energy_dim)**2
+    t[2:] = t[2:] - int(energy_dim/2)*2
+    t = tuple(t)
+    c = int(act_dim/2)-int(energy_dim/2)
     
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
+    windows_curr_obs = windows_curr_obs.reshape(t)[:,:,c:-c,c:-c].reshape(t[:2]+(-1,)) 
     current_energy = num_diff_neighbors_inline(windows_curr_obs)
     windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
     windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
+    windows_next_obs = windows_next_obs.reshape(t)[:,:,c:-c,c:-c].reshape(t[:2]+(-1,)) 
+    
+    
+    
+    
     
     ll = []
     for i in range(windows_curr_act.shape[1]):
@@ -2318,7 +2340,6 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     #The total energy label is a decay sum of those action energy changes
     
     # CALCULATE ALL THE ACTION ENERGY CHANGES
-    size = im_seq.shape[1:]
     energy_changes = []
     for i in range(im_seq.shape[0]-1):
         ims_curr = im_seq[i].unsqueeze(0) 
@@ -2330,7 +2351,7 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     energy_change = torch.cat(energy_changes, dim=2)
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(1,1,-1).to(im_seq.device)
-    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((np.product(size),)+(act_dim,)*(len(size)-1))
+    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((-1,)+(act_dim,)*(im_seq.dim()-2))
     
     return energy_labels
 
@@ -2355,10 +2376,26 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     window_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)[0]
     ims_next_flat = ims_next.view(ims_next.shape[0], -1)
     
+    
+    
+    
+    #delete later
+    # ims_next_flat = ims_next_flat.reshape(-1,64,64)[:,8:-8,8:-8].reshape(-1,48*48)
+    
+    
+    
+    
+    #assumes 2d for now too, just update the "c"s later #!!!
+    c = int(act_dim/2)
+    ims_next_flat = ims_next_flat.reshape((-1,)+sz[2:])[:,c:-c,c:-c].reshape(sz[0]-1,-1) 
+    
+    
+    
+    
     actions_marked = window_act.unsqueeze(0).expand(sz[0]-1,-1,-1)==ims_next_flat.unsqueeze(1) #Mark the actions that matches each future image (the "action taken")
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(-1,1,1).to(im.device)
-    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((np.product(sz[1:]),)+(act_dim,)*(len(sz)-2))
+    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((-1,)+(act_dim,)*(im_seq.dim()-2))
     
     return action_labels
 
@@ -2369,13 +2406,7 @@ def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
     
     # action_labels = my_normalize(action_labels)
    
-    
-   
-    
     labels = action_labels + reg*energy_labels
-    
-    
-    
     
     # labels = (labels+reg)/(reg+1)
     
@@ -2390,12 +2421,11 @@ def my_normalize(data):
     return (data-mi)/(ma-mi)
     
 
-
 def compute_features(im, obs_dim=9, pad_mode='circular'):
-    size = im.shape[1:]
     local_energy = num_diff_neighbors(im, window_size=7, pad_mode=pad_mode)
-    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
+    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((-1,)+(obs_dim,)*(im.dim()-2))
     return features
+
 
 
 
@@ -2422,9 +2452,11 @@ def compute_action_energy_change_miso(im, im_next, miso_matrix, energy_dim=3, ac
     num_dims = len(im.shape)-2
     
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
+    windows_curr_obs = windows_curr_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) #!!! hardcoded
     current_energy = neighborhood_miso_inline(windows_curr_obs, miso_matrix)
     windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
     windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
+    windows_next_obs = windows_next_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) #!!! hardcoded
     
     ll = []
     for i in range(windows_curr_act.shape[1]):
@@ -2443,7 +2475,6 @@ def compute_energy_labels_miso(im_seq, miso_matrix, act_dim=9, pad_mode="circula
     #The total energy label is a decay sum of those action energy changes
     
     # CALCULATE ALL THE ACTION ENERGY CHANGES
-    size = im_seq.shape[1:]
     energy_changes = []
     for i in range(im_seq.shape[0]-1):
         ims_curr = im_seq[i].unsqueeze(0)
@@ -2455,7 +2486,7 @@ def compute_energy_labels_miso(im_seq, miso_matrix, act_dim=9, pad_mode="circula
     energy_change = torch.cat(energy_changes, dim=2)
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(1,1,-1).to(im_seq.device)
-    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((np.product(size),)+(act_dim,)*(len(size)-1))
+    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((-1,)+(act_dim,)*(im_seq.dim()-2))
     
     return energy_labels
 
@@ -2475,8 +2506,8 @@ def compute_labels_miso(im_seq, miso_matrix, obs_dim=9, act_dim=9, reg=1, pad_mo
 
 
 def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
-    size = im.shape[1:]
     local_energy = neighborhood_miso(im, miso_matrix, window_size=7, pad_mode=pad_mode)
     # local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
-    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
+    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((-1,)+(obs_dim,)*(im.dim()-2))
+    
     return features
