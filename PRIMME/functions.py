@@ -673,7 +673,6 @@ def process_dump(path_to_dump='./spparks_simulations/spparks.dump'):
 def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4, freq = (1,1), del_sim=False):
     #'freq' - [how often to report stats on the simulation, how often to dump an image or record]
             
-    
     # SET SIMULATION PATH
     path_sim = './spparks_simulation_trainset/'
         
@@ -714,6 +713,54 @@ def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cuto
             dset1[i,] = ims_energy[-(future_steps+1):,] 
             dset2[i,:ngrains,] = grain_euler_angles
             dset3[i,:int(ngrains*(ngrains-1)/2),] = miso_array
+            
+    if del_sim: os.system(r"rm -r %s"%path_sim) #remove entire folder
+    
+    return fp
+
+
+def create_SPPARKS_dataset_circles(size=[512,512], radius_rng=[64,200], kt=0.66, cutoff=0.0, nsets=200, max_steps=10, offset_steps=1, future_steps=4, freq = (1,1), del_sim=False):
+    #'freq' - [how often to report stats on the simulation, how often to dump an image or record]
+            
+    # SET SIMULATION PATH
+    path_sim = './spparks_simulation_trainset/'
+        
+    # NAMING CONVENTION   
+    sz_str = ''.join(['%dx'%i for i in size])[:-1]
+    fp = './data/trainset_spparks_sz(%s)_r(%d-%d)_nsets(%d)_future(%d)_max(%d)_kt(%.2f)_freq(%.1f)_cut(%d).h5'%(sz_str,radius_rng[0],radius_rng[1],nsets,future_steps,max_steps,kt,freq[0],cutoff)
+
+    # DETERMINE THE SMALLEST POSSIBLE DATA TYPE POSSIBLE
+    m = 2 #number of grains
+    dtype = 'uint8'
+    
+    h5_shape = (nsets, future_steps+1, 1) + tuple(size)
+    h5_shape2 = (nsets, m, 3)
+    h5_shape3 = (nsets, int(m*(m-1)/2))
+
+    with h5py.File(fp, 'w') as f:
+        dset = f.create_dataset("ims_id", shape=h5_shape, dtype=dtype)
+        dset1 = f.create_dataset("ims_energy", shape=h5_shape)
+        dset2 = f.create_dataset("euler_angles", shape=h5_shape2)
+        dset3 = f.create_dataset("miso_array", shape=h5_shape3)
+        for i in tqdm(range(nsets)):
+            
+            # SET PARAMETERS
+            r = np.random.randint(radius_rng[0], radius_rng[1]+1) #number of grains
+            nsteps = np.random.randint(offset_steps+future_steps, max_steps+1) #SPPARKS steps to run
+            rseed = np.random.randint(10000) #change to get different growth from teh same initial condition
+            
+            # RUN SIMULATION
+            im, ea = generate_circleIC(size, r)
+            miso_array = find_misorientation(ea, mem_max=1) 
+            run_spparks(im, ea, nsteps, kt, cutoff, freq, rseed, miso_array=miso_array, save_sim=False, del_sim=del_sim, path_sim=path_sim, num_processors=32)
+            grain_ID_images, grain_euler_angles, ims_energy = process_dump('%s/spparks.dump'%path_sim)
+            # miso = np.loadtxt('%s/Miso.txt'%path_sim)*cutoff/180*np.pi #convert to radians
+            
+            # WRITE TO FILE
+            dset[i,] = grain_ID_images[-(future_steps+1):,] 
+            dset1[i,] = ims_energy[-(future_steps+1):,] 
+            dset2[i,:] = grain_euler_angles
+            dset3[i,:,] = miso_array
             
     if del_sim: os.system(r"rm -r %s"%path_sim) #remove entire folder
     
