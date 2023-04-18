@@ -31,8 +31,8 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-# device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-device=torch.device("cpu")
+device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+# device=torch.device("cpu")
 
 
 
@@ -126,9 +126,17 @@ def wrap_slice(data, slices_txt):
         list_index = ''.join(['[%d]'%jj for jj in j])
         slices_select = tuple([slices[k][j[k]] for k in range(len(slices))])
         slices_select = ''.join(['%s,',]*len(slices))[:-1]%slices_select
-        exec('log%s = data[%s]'%(list_index, slices_select))
         
-    return np.block(log).squeeze(tuple(dims_remove))
+        if type(data)==torch.Tensor:
+            exec('log%s = data[%s].cpu().numpy()'%(list_index, slices_select))
+        else:
+            exec('log%s = data[%s]'%(list_index, slices_select))
+      
+    tmp = np.block(log).squeeze(tuple(dims_remove))
+    if type(data)==torch.Tensor: 
+        return torch.Tensor(tmp).to(data.device)
+    else:
+        return tmp
 
 
 
@@ -1589,8 +1597,8 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
         c = tmp
     
     # Make sure all needed datasets exist
-    dts=['grain_areas', 'grain_sides', 'ims_miso', 'ims_miso_spparks']
-    check_exist_h5(hps, gps, dts)  
+    # dts=['grain_areas', 'grain_sides', 'ims_miso', 'ims_miso_spparks']
+    # check_exist_h5(hps, gps, dts)  
     
     # Calculate scale limit
     with h5py.File(hps[0], 'r') as f:
@@ -2346,25 +2354,20 @@ def compute_action_energy_change(im, im_next, energy_dim=3, act_dim=9, pad_mode=
     # windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
     # windows_next_obs = windows_next_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1)
     
-    
-    
-    
-    
-    #assumes pad_mode=None, but is actually circlular along all dimensions
-    #assumes 2d for now too, just update the "c"s later #!!!
-    
+    #NEW
     t = np.array(im.shape)
-    t[1] = int(energy_dim)**2
+    t[1] = int(energy_dim)**num_dims
     t[2:] = t[2:] - int(energy_dim/2)*2
     t = tuple(t)
     c = int(act_dim/2)-int(energy_dim/2)
+    cc = [slice(None),]*2 + [slice(c,-c),]*num_dims
     
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
-    windows_curr_obs = windows_curr_obs.reshape(t)[:,:,c:-c,c:-c].reshape(t[:2]+(-1,)) 
+    windows_curr_obs = windows_curr_obs.reshape(t)[cc].reshape(t[:2]+(-1,)) 
     current_energy = num_diff_neighbors_inline(windows_curr_obs)
     windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
     windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
-    windows_next_obs = windows_next_obs.reshape(t)[:,:,c:-c,c:-c].reshape(t[:2]+(-1,)) 
+    windows_next_obs = windows_next_obs.reshape(t)[cc].reshape(t[:2]+(-1,)) 
     
     
     
@@ -2416,6 +2419,7 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     #The total energy label is a decay sum of those action labels
 
     sz = im_seq.shape
+    num_dims = len(sz)-2
     im = im_seq[0:1,]
     ims_next = im_seq[1:]
     
@@ -2429,12 +2433,10 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     #delete later
     # ims_next_flat = ims_next_flat.reshape(-1,64,64)[:,8:-8,8:-8].reshape(-1,48*48)
     
-    
-    
-    
-    #assumes 2d for now too, just update the "c"s later #!!!
+    #NEW
     c = int(act_dim/2)
-    ims_next_flat = ims_next_flat.reshape((-1,)+sz[2:])[:,c:-c,c:-c].reshape(sz[0]-1,-1) 
+    cc = [slice(None),]*1 + [slice(c,-c),]*num_dims
+    ims_next_flat = ims_next_flat.reshape((-1,)+sz[2:])[cc].reshape(sz[0]-1,-1) 
     
     
     
