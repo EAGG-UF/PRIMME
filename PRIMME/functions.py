@@ -2388,34 +2388,10 @@ def compute_action_energy_change(im, im_next, energy_dim=3, act_dim=9, pad_mode=
     num_dims = im.dim()-2
     
     
-    
-    
-    #delete later
-    # windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
-    # windows_curr_obs = windows_curr_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) 
-    # current_energy = num_diff_neighbors_inline(windows_curr_obs)
-    # windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
-    # windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
-    # windows_next_obs = windows_next_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1)
-    
-    #NEW
-    t = np.array(im.shape)
-    t[1] = int(energy_dim)**num_dims
-    t[2:] = t[2:] - int(energy_dim/2)*2
-    t = tuple(t)
-    c = int(act_dim/2)-int(energy_dim/2)
-    cc = [slice(None),]*2 + [slice(c,-c),]*num_dims
-    
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
-    windows_curr_obs = windows_curr_obs.reshape(t)[cc].reshape(t[:2]+(-1,)) 
     current_energy = num_diff_neighbors_inline(windows_curr_obs)
     windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
     windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
-    windows_next_obs = windows_next_obs.reshape(t)[cc].reshape(t[:2]+(-1,)) 
-    
-    
-    
-    
     
     ll = []
     for i in range(windows_curr_act.shape[1]):
@@ -2450,41 +2426,17 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     return energy_labels
 
 
-def compute_energy_labels2(im_seq, act_dim=9, energy_dim=3, pad_mode="circular"):
-    window_act = my_unfoldNd(im_seq[0:1,], kernel_size=act_dim, pad_mode=pad_mode)[0]
-    window_act2 = my_unfoldNd(im_seq[0:1,], kernel_size=energy_dim, pad_mode=pad_mode)[0]
-    tmp = (window_act2[None,]==window_act[:,None,]).permute(2,1,0)
-    energy_labels = my_batch(tmp, torch.sum, batch_sz=100).reshape(-1,17,17)/(energy_dim**2)
-    return energy_labels.to(im_seq.device)
-
-
 def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     #Label which actions in each action window were actually taken between the first image and all following
     #The total energy label is a decay sum of those action labels
 
     sz = im_seq.shape
-    num_dims = len(sz)-2
     im = im_seq[0:1,]
     ims_next = im_seq[1:]
     
     # CALCULATE ACTION LABELS
     window_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)[0]
     ims_next_flat = ims_next.view(ims_next.shape[0], -1)
-    
-    
-    
-    
-    #delete later
-    # ims_next_flat = ims_next_flat.reshape(-1,64,64)[:,8:-8,8:-8].reshape(-1,48*48)
-    
-    #NEW
-    c = int(act_dim/2)
-    cc = [slice(None),]*1 + [slice(c,-c),]*num_dims
-    ims_next_flat = ims_next_flat.reshape((-1,)+sz[2:])[cc].reshape(sz[0]-1,-1) 
-    
-    
-    
-    
     actions_marked = window_act.unsqueeze(0).expand(sz[0]-1,-1,-1)==ims_next_flat.unsqueeze(1) #Mark the actions that matches each future image (the "action taken")
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(-1,1,1).to(im.device)
@@ -2545,11 +2497,9 @@ def compute_action_energy_change_miso(im, im_next, miso_matrix, energy_dim=3, ac
     num_dims = len(im.shape)-2
     
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
-    windows_curr_obs = windows_curr_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) #!!! hardcoded
     current_energy = neighborhood_miso_inline(windows_curr_obs, miso_matrix)
     windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
     windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
-    windows_next_obs = windows_next_obs.reshape(1,9,62,62)[:,:,7:-7,7:-7].reshape(1,9,-1) #!!! hardcoded
     
     ll = []
     for i in range(windows_curr_act.shape[1]):

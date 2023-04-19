@@ -61,6 +61,45 @@ a = fs.unfold_in_batches(im, batch_sz, kernel_sz, stride, if_shuffle)
 
 
 
+'''
+PRIMME is a deep learning model
+If you give it an image, it will get you the next image
+If you give it the next image and ask it to train, it will do that too
+
+Step - given image, find features, finds next image, saves needed information
+Train - given sequence, runs step, finds labels, trains, saves need information
+Evaluate - 
+Plot - 
+
+
+'''
+
+
+#what is primme meant to do?
+
+#input image
+#calculate features
+#calculate labels
+#step - given im, find features, through model, 
+#train
+#evaluate
+#plot
+
+
+#train - 
+#
+
+#simulate
+
+
+
+
+
+
+
+
+
+
 
 
 
