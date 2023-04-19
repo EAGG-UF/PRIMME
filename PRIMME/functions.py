@@ -139,6 +139,50 @@ def wrap_slice(data, slices_txt):
         return tmp
 
 
+def shape_indices(i, sz):
+    #'i' can be used to index the flattened Tensor 
+    #'i_shaped' can index the same values in the same Tensor of shape 'sz'
+    i_shaped = []
+    for s in sz.flip(0): 
+        i_shaped.append((i%s).long())
+        # i = torch.floor_divide(i,s)
+        i = torch.div(i, s, rounding_mode='floor')
+    i_shaped.reverse()
+    return i_shaped
+
+
+def flatten_indices(indices, sz):
+    #'indices' can index the same values in the same Tensor of shape 'sz'
+    #'index' can be used to index the flattened Tensor 
+    index = indices[-1].long()
+    for i in range(1, len(indices)):
+        index += (indices[-i-1]*torch.prod(sz[-i:])).long()
+    return index
+
+
+def unfold_in_batches(im, batch_sz, kernel_sz, stride, if_shuffle=False):
+    #Create an unfolded view of 'im' (torch.Tensor) 
+    #Given 'kernel_sz' (tuple) and 'stride' (tuple)
+    #Yield 'batch_sz' (int) portions of the view at a time
+    #Shuffles output if 'if_shuffle', but yields each kernal once each
+    
+    dm = im.dim()
+    sz = tuple(im.size())
+    sz_new = torch.Tensor(sz)-(torch.Tensor(kernel_sz)-1)
+    num_kernels = int(torch.prod(sz_new))
+    
+    im_unfolded = im.unfold(0,kernel_sz[0],stride[0])
+    for i in range(dm-1): im_unfolded = im_unfolded.unfold(i+1,kernel_sz[i+1],stride[i+1])
+    
+    if if_shuffle is True: i = torch.randperm(num_kernels)
+    else: i = torch.arange(num_kernels)
+    i_split = torch.split(i,batch_sz)
+    
+    for j in i_split:
+        indices = shape_indices(j, sz_new)
+        yield im_unfolded[indices]
+
+
 
 
 
