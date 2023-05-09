@@ -25,6 +25,8 @@ import matplotlib.colors as mcolors
 
 ### Script
 
+unfold_mem_lim = 48e9
+
 fp = './data/'
 if not os.path.exists(fp): os.makedirs(fp)
 
@@ -160,20 +162,28 @@ def flatten_indices(indices, sz):
     return index
 
 
-def unfold_in_batches(im, batch_sz, kernel_sz, stride, if_shuffle=False):
-    #Create an unfolded view of 'im' (torch.Tensor) 
+def unfold_in_batches(im, batch_sz, kernel_sz, stride, pad_mode='circular', if_shuffle=False):
+    #Create an unfolded view of 'im' (torch.Tensor)
     #Given 'kernel_sz' (tuple) and 'stride' (tuple)
     #Yield 'batch_sz' (int) portions of the view at a time
     #Shuffles output if 'if_shuffle', but yields each kernal once each
     
+    #Pad the image
+    tmp = torch.Tensor(kernel_sz)/torch.Tensor(stride)/2
+    pad = tuple(np.flip(tmp.repeat_interleave(2).int().numpy())) #calculate padding needed based on kernel_size
+    if pad_mode!=None: im = pad_mixed(im[None,None], pad, pad_mode)[0,0,] #pad "ims" to maintain dimensions after unfolding
+    
+    #Variables
     dm = im.dim()
     sz = tuple(im.size())
     sz_new = torch.Tensor(sz)-(torch.Tensor(kernel_sz)-1)
     num_kernels = int(torch.prod(sz_new))
     
+    #Unfold as a view
     im_unfolded = im.unfold(0,kernel_sz[0],stride[0])
     for i in range(dm-1): im_unfolded = im_unfolded.unfold(i+1,kernel_sz[i+1],stride[i+1])
     
+    #Split and return unfold in batches
     if if_shuffle is True: i = torch.randperm(num_kernels)
     else: i = torch.arange(num_kernels)
     i_split = torch.split(i,batch_sz)
@@ -1376,17 +1386,41 @@ def neighborhood_miso(ims, miso_matrices, window_size=3, pad_mode='circular'):
     # window_size - the patch around each pixel that constitutes its neighbors
     # May need to add memory management through batches for large tensors in the future
     
+    
+    #NEW #!!!
     if type(window_size)==int: window_size = [window_size] #convert to "list" if "int" is given
     
-    ims_unfold = my_unfoldNd(ims, kernel_size=window_size, pad_mode=pad_mode)
-    # miso_matrices = miso_array_to_matrix(miso_arrays) #indicies to convert miso array to matrix
-    # del miso_arrays
-    ims_unfold_miso = gid_to_miso(ims_unfold, miso_matrices)
-    del miso_matrices
+    d = ims.dim()-2
+    kernel_sz = window_size*d
+    stride = (1,)*d
     
+    batch_sz = int(unfold_mem_lim/(torch.prod(torch.Tensor(kernel_sz))*64))
+    unfold_gen = unfold_in_batches(ims[0,0], batch_sz, kernel_sz, stride, pad_mode)
+      
+    log = []
+    for batch in unfold_gen:
+        im_unfold = batch.reshape(batch.shape[0],-1).T[None,]
+        im_unfold_miso = gid_to_miso(im_unfold, miso_matrices)
+        log.append(torch.sum(im_unfold_miso, axis=1)[0])
+        
     if pad_mode==None: s = ims.shape[:2]+tuple(np.array(ims.shape[2:])-window_size+1)
     else: s = ims.shape
-    ims_miso = torch.sum(ims_unfold_miso, axis=1).reshape(s) #misorientation image
+    ims_miso = torch.cat(log).reshape(s) #misorientation image
+    
+    
+    # if type(window_size)==int: window_size = [window_size] #convert to "list" if "int" is given
+    
+    # ims_unfold = my_unfoldNd(ims, kernel_size=window_size, pad_mode=pad_mode)
+    # # miso_matrices = miso_array_to_matrix(miso_arrays) #indicies to convert miso array to matrix
+    # # del miso_arrays
+    # ims_unfold_miso = gid_to_miso(ims_unfold, miso_matrices)
+    # del miso_matrices
+    
+    # if pad_mode==None: s = ims.shape[:2]+tuple(np.array(ims.shape[2:])-window_size+1)
+    # else: s = ims.shape
+    # ims_miso = torch.sum(ims_unfold_miso, axis=1).reshape(s) #misorientation image
+    
+    
     return ims_miso #reshape to orignal image shape
 
 
@@ -2359,15 +2393,43 @@ def num_diff_neighbors(ims, window_size=3, pad_mode='circular'):
     #window_size - the patch around each pixel that constitutes its neighbors
     #May need to add memory management through batches for large tensors in the future
     
+    
+    #NEW #!!!
     if type(window_size)==int: window_size = [window_size] #convert to "list" if "int" is given
     
-    ims_unfold = my_unfoldNd(ims, kernel_size=window_size, pad_mode=pad_mode)
-    center_pxl_ind = int(ims_unfold.shape[1]/2)
-    ims_diff_unfold = torch.sum(ims_unfold[:,center_pxl_ind,] != ims_unfold.transpose(0,1), dim=0) #shape = [N, dim1*dim2*dim3]
+    d = ims.dim()-2
+    kernel_sz = window_size*d
+    stride = (1,)*d
     
+    batch_sz = int(unfold_mem_lim/(torch.prod(torch.Tensor(kernel_sz))*64))
+    unfold_gen = unfold_in_batches(ims[0,0], batch_sz, kernel_sz, stride, pad_mode)
+    
+    log = []
+    for batch in unfold_gen:
+        im_unfold = batch.reshape(batch.shape[0],-1).T[None,]
+        center_pxl_ind = int(im_unfold.shape[1]/2)
+        tmp = torch.sum(im_unfold[:,center_pxl_ind,] != im_unfold.transpose(0,1), dim=0)
+        log.append(tmp)
+        
     if pad_mode==None: s = ims.shape[:2]+tuple(np.array(ims.shape[2:])-window_size+1)
     else: s = ims.shape
-    return ims_diff_unfold.reshape(s) #reshape to orignal image shape
+    ims_diff = torch.cat(log).reshape(s) #misorientation image
+    
+    
+    #delete this later
+    # if type(window_size)==int: window_size = [window_size] #convert to "list" if "int" is given
+    
+    # ims_unfold = my_unfoldNd(ims, kernel_size=window_size, pad_mode=pad_mode)
+    # center_pxl_ind = int(ims_unfold.shape[1]/2)
+    # ims_diff_unfold = torch.sum(ims_unfold[:,center_pxl_ind,] != ims_unfold.transpose(0,1), dim=0) #shape = [N, dim1*dim2*dim3]
+    
+    # if pad_mode==None: s = ims.shape[:2]+tuple(np.array(ims.shape[2:])-window_size+1)
+    # else: s = ims.shape
+    
+    # ims_diff = ims_diff_unfold.reshape(s) 
+    
+    
+    return ims_diff
 
 
 def num_diff_neighbors_inline(ims_unfold): 
@@ -2387,19 +2449,18 @@ def compute_action_energy_change(im, im_next, energy_dim=3, act_dim=9, pad_mode=
     
     num_dims = im.dim()-2
     
-    
     windows_curr_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) 
-    current_energy = num_diff_neighbors_inline(windows_curr_obs)
-    windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode)
-    windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode)
+    current_energy = num_diff_neighbors_inline(windows_curr_obs) #torch.Size([1, 66049])
+    windows_curr_act = my_unfoldNd(im, kernel_size=act_dim, pad_mode=pad_mode) #torch.Size([1, 289, 66049])
+    windows_next_obs = my_unfoldNd(im_next, kernel_size=energy_dim, pad_mode=pad_mode) #torch.Size([1, 9, 66049])
     
     ll = []
     for i in range(windows_curr_act.shape[1]):
         windows_next_obs[:,int(energy_dim**num_dims/2),:] = windows_curr_act[:,i,:]
         ll.append(num_diff_neighbors_inline(windows_next_obs))
-    action_energy = torch.cat(ll)[...,None]
+    action_energy = torch.cat(ll)[...,None] #torch.Size([289, 66049, 1])
     
-    energy_change = (current_energy.transpose(0,1)-action_energy)/(energy_dim**num_dims-1)
+    energy_change = (current_energy.transpose(0,1)[None,]-action_energy)/(energy_dim**num_dims-1) #torch.Size([289, 66049, 1])
     
     return energy_change
     
@@ -2411,7 +2472,7 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     
     # CALCULATE ALL THE ACTION ENERGY CHANGES
     energy_changes = []
-    for i in range(im_seq.shape[0]-1):
+    for i in range(im_seq.shape[0]-1): 
         ims_curr = im_seq[i].unsqueeze(0) 
         ims_next = im_seq[i+1].unsqueeze(0)
         energy_change = compute_action_energy_change(ims_curr, ims_next, act_dim=act_dim, pad_mode=pad_mode)
@@ -2426,10 +2487,51 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     return energy_labels
 
 
+def compute_energy_labels_gen(im_seq, batch_sz, act_dim=9, energy_dim=3, pad_mode="circular"): #!!! NEW
+    #Computes energy labels used for PRIMME regularization
+    #Yields in batches to conserve memory
+    #Find possible actions around each pixel in a "act_dim" neighborhood
+    #Compute number of different neighbors as energy using a "energy_dim" neighborhood
+    #Energy labels are the change in energy for each possible action (initial minus action energy)
+    #Repeat for each future step and sum together with a discount of 1/2
+    
+    #Find parameters
+    num_fut = im_seq.shape[0]-1 #number of future steps
+    d = im_seq.dim()-2 #number of dimensions
+    stride = [num_fut,1,1] 
+    num_iter = int(np.ceil(np.prod(im_seq.shape[1:])/batch_sz))
+    
+    #Find current energy
+    log = []
+    for im in im_seq[1:]: 
+         log.append(num_diff_neighbors(im[None,], window_size=energy_dim, pad_mode=pad_mode))
+    current_energy = torch.cat(log).reshape(num_fut,-1).T
+    
+    #Create generators
+    current_energy_split = current_energy.split(batch_sz)
+    windows_curr_act_gen = unfold_in_batches(im_seq[:-1,0], batch_sz, [num_fut]+[act_dim,]*d, stride, pad_mode)
+    windows_next_obs_gen = unfold_in_batches(im_seq[1:,0], batch_sz, [num_fut]+[energy_dim,]*d, stride, pad_mode)
+    
+    #Yield the energy labels for each batch
+    for i in range(num_iter):
+        current_energy = current_energy_split[i]
+        windows_curr_act = next(windows_curr_act_gen).reshape(-1, num_fut, act_dim**d).unsqueeze(3)
+        windows_next_obs = next(windows_next_obs_gen).reshape(-1, num_fut, energy_dim**d).unsqueeze(2)#.repeat(1,1,windows_curr_act.shape[-1],1)
+        tmp = windows_next_obs != windows_curr_act 
+        action_energy = tmp.sum(-1) - tmp[..., int(energy_dim**d/2)].int() 
+        energy_change = (current_energy[..., None]-action_energy)/(energy_dim**d-1)
+        
+        decay_rate = 1/2
+        decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(1,-1,1).to(im_seq.device)
+        energy_labels = (energy_change*decay).sum(1).reshape((-1,)+(act_dim,)*(im_seq.dim()-2))
+        
+        yield energy_labels
+
+
 def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     #Label which actions in each action window were actually taken between the first image and all following
     #The total energy label is a decay sum of those action labels
-
+    
     sz = im_seq.shape
     im = im_seq[0:1,]
     ims_next = im_seq[1:]
@@ -2445,7 +2547,35 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     return action_labels
 
 
-def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
+def compute_action_labels_gen(im_seq, batch_sz, act_dim=9, pad_mode="circular"): #!!! NEW
+    #Label which actions in each action window were actually taken between the first image and all following
+    #The total energy label is a decay sum of those action labels
+    
+    #Find parameters
+    num_fut = im_seq.shape[0]-1 #number of future steps
+    d = im_seq.dim()-2 #number of dimensions
+    num_iter = int(np.ceil(np.prod(im_seq.shape[1:])/batch_sz))
+    
+    #Create generators
+    im = im_seq[0:1,]
+    ims_next = im_seq[1:].reshape(num_fut,-1).T
+    ims_next_split = ims_next.split(batch_sz)
+    window_act_gen = unfold_in_batches(im[0,0,], batch_sz, [act_dim,]*d, [1,]*d, pad_mode)
+    
+    #Yield the energy labels for each batch
+    for i in range(num_iter):
+        ims_next = ims_next_split[i]
+        window_act = next(window_act_gen).reshape(-1,act_dim**d)
+        actions_marked = window_act.unsqueeze(1) == ims_next.unsqueeze(2)
+        
+        decay_rate = 1/2
+        decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(1,-1,1).to(im_seq.device)
+        action_labels = (actions_marked*decay).sum(1).reshape((-1,)+(act_dim,)*(im_seq.dim()-2))
+            
+        yield action_labels
+    
+    
+def compute_labels(im_seq, act_dim=9, reg=1, pad_mode="circular"):
     energy_labels = compute_energy_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     action_labels = compute_action_labels(im_seq, act_dim=act_dim, pad_mode=pad_mode)
     
@@ -2460,6 +2590,23 @@ def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
     return labels
 
 
+def compute_labels_gen(im_seq, batch_sz, act_dim=9, energy_dim=3, reg=1, pad_mode="circular"): #!!! NEW 
+        
+    #Find parameters
+    num_iter = int(np.ceil(np.prod(im_seq.shape[1:])/batch_sz))
+    
+    #Create generators
+    energy_labels_gen = compute_energy_labels_gen(im_seq, batch_sz, act_dim, energy_dim, pad_mode)
+    action_labels_gen = compute_action_labels_gen(im_seq, batch_sz, act_dim, pad_mode)
+    
+    #Yield the energy labels for each batch
+    for i in range(num_iter):
+        energy_labels = next(energy_labels_gen)
+        action_labels = next(action_labels_gen)
+        labels = action_labels + reg*energy_labels
+        yield labels
+    
+
 def my_normalize(data):
     mi = torch.min(data)
     ma = torch.max(data)
@@ -2470,6 +2617,16 @@ def compute_features(im, obs_dim=9, pad_mode='circular'):
     local_energy = num_diff_neighbors(im, window_size=7, pad_mode=pad_mode)
     features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((-1,)+(obs_dim,)*(im.dim()-2))
     return features
+
+
+def compute_features_gen(im, batch_sz, obs_dim=9, pad_mode='circular'): #NEW #!!!
+    local_energy = num_diff_neighbors(im, window_size=7, pad_mode=pad_mode)
+    
+    d = local_energy.dim()-2
+    unfold_gen = unfold_in_batches(local_energy[0,0], batch_sz, [obs_dim,]*d, (1,)*d, pad_mode)
+    
+    for batch in unfold_gen:
+        yield batch
 
 
 
@@ -2554,3 +2711,14 @@ def compute_features_miso(im, miso_matrix, obs_dim=9, pad_mode='circular'):
     features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((-1,)+(obs_dim,)*(im.dim()-2))
     
     return features
+
+
+def compute_features_miso_gen(im, batch_sz, miso_matrix, obs_dim=9, pad_mode='circular'): #NEW #!!!
+    local_energy = neighborhood_miso(im, miso_matrix, window_size=7, pad_mode=pad_mode)
+    # local_energy = neighborhood_miso_spparks(im, miso_matrix, window_size=7, pad_mode=pad_mode)
+    
+    d = local_energy.dim()-2
+    unfold_gen = unfold_in_batches(local_energy[0,0], batch_sz, [obs_dim,]*d, (1,)*d, pad_mode)
+      
+    for batch in unfold_gen:
+        yield batch

@@ -8,7 +8,6 @@ IF THIS CODE IS USED FOR A RESEARCH PUBLICATION, please cite:
 
 
 
-
 ### Import functions
 import functions as fs
 import PRIMME as fsp
@@ -18,10 +17,10 @@ import PRIMME as fsp
 # trainset_location = fs.create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4)
 
 
-# ### Train PRIMME using the above training set from SPPARKS
+### Train PRIMME using the above training set from SPPARKS
 trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
 # trainset_location = "./data/trainset_spparks_sz(93x93x93)_ng(256-256)_nsets(200)_future(4)_max(50)_kt(0.66)_freq(0.5)_cut(0).h5"
-model_location = fsp.train_primme(trainset_location, num_eps=1000, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode='circular', plot_freq=100)
+model_location = fsp.train_primme(trainset_location, num_eps=1000, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode='circular', plot_freq=20)
 
 
 
