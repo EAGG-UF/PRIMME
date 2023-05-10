@@ -25,7 +25,7 @@ import matplotlib.colors as mcolors
 
 ### Script
 
-unfold_mem_lim = 48e9
+unfold_mem_lim = .1e9
 
 fp = './data/'
 if not os.path.exists(fp): os.makedirs(fp)
@@ -162,25 +162,50 @@ def flatten_indices(indices, sz):
     return index
 
 
+def periodic_pad_1d(im, dim, p):
+    #Pads 'im' along 'dim' with an int 'p' of padding on both sides
+    
+    if p==0: return im
+    
+    num_dim = im.dim()
+    
+    b = dim #number of empty slices before the dimension
+    a = num_dim - dim - 1 #number of empty slices after the dimension
+    
+    im_padded = F.pad(im, [0,0]*a+[p,p])
+    im_padded[(slice(None),)*b + (slice(None,p),) + (slice(None),)*a] = im[(slice(None),)*b + (slice(-p,None),) + (slice(None),)*a]
+    im_padded[(slice(None),)*b + (slice(-p,None),) + (slice(None),)*a] = im[(slice(None),)*b + (slice(None,p),) + (slice(None),)*a] 
+    
+    return im_padded
+
+
 def unfold_in_batches(im, batch_sz, kernel_sz, stride, pad_mode='circular', if_shuffle=False):
     #Create an unfolded view of 'im' (torch.Tensor)
     #Given 'kernel_sz' (tuple) and 'stride' (tuple)
     #Yield 'batch_sz' (int) portions of the view at a time
-    #Shuffles output if 'if_shuffle', but yields each kernal once each
+    #Shuffles output if 'if_shuffle', then yields each kernal once each
     
-    #Pad the image
-    tmp = torch.Tensor(kernel_sz)/torch.Tensor(stride)/2
-    pad = tuple(np.flip(tmp.repeat_interleave(2).int().numpy())) #calculate padding needed based on kernel_size
-    if pad_mode!=None: im = pad_mixed(im[None,None], pad, pad_mode)[0,0,] #pad "ims" to maintain dimensions after unfolding
+    im_padded = im.clone()
+    for i in range(len(kernel_sz)):
+        p = int(kernel_sz[i]/stride[i]/2)
+        im_padded = periodic_pad_1d(im_padded, i, p)
+        
     
+    # # Delete later, doesn't work for 3D #!!!
+    # #Pad the image
+    # tmp = torch.Tensor(kernel_sz)/torch.Tensor(stride)/2
+    # pad = tuple(np.flip(tmp.repeat_interleave(2).int().numpy())) #calculate padding needed based on kernel_size
+    # if pad_mode!=None: im_padded = pad_mixed(im[None,None], pad, pad_mode)[0,0,] #pad "ims" to maintain dimensions after unfolding
+    
+
     #Variables
-    dm = im.dim()
-    sz = tuple(im.size())
+    dm = im_padded.dim()
+    sz = tuple(im_padded.size())
     sz_new = torch.Tensor(sz)-(torch.Tensor(kernel_sz)-1)
     num_kernels = int(torch.prod(sz_new))
     
     #Unfold as a view
-    im_unfolded = im.unfold(0,kernel_sz[0],stride[0])
+    im_unfolded = im_padded.unfold(0,kernel_sz[0],stride[0])
     for i in range(dm-1): im_unfolded = im_unfolded.unfold(i+1,kernel_sz[i+1],stride[i+1])
     
     #Split and return unfold in batches
@@ -190,7 +215,7 @@ def unfold_in_batches(im, batch_sz, kernel_sz, stride, pad_mode='circular', if_s
     
     for j in i_split:
         indices = shape_indices(j, sz_new)
-        yield im_unfolded[indices]
+        yield im_unfolded[indices].float()
 
 
 
@@ -1534,39 +1559,39 @@ def compute_grain_stats(hps, gps='last', device=device):
                 g['grain_sides_avg'] = grain_sides_avg
                 print('Calculated: grain_sides_avg')
             
-            # Find misorientation images
-            if 'ims_miso' not in g.keys():
-                args = [miso_matrix[None,]]
-                func = neighborhood_miso
-                ims_miso = iterate_function(d, func, args)[:,0]
-                g['ims_miso'] = ims_miso
-                print('Calculated: ims_miso')
-            else: ims_miso = None
+            # # Find misorientation images
+            # if 'ims_miso' not in g.keys():
+            #     args = [miso_matrix[None,]]
+            #     func = neighborhood_miso
+            #     ims_miso = iterate_function(d, func, args)[:,0]
+            #     g['ims_miso'] = ims_miso
+            #     print('Calculated: ims_miso')
+            # else: ims_miso = None
                 
-            # Find average misorientation per boundary pixel
-            if 'ims_miso_avg' not in g.keys():
-                if np.all(ims_miso==None): ims_miso = g['ims_miso']
-                func = mean_wo_zeros
-                ims_miso_avg = iterate_function(ims_miso, func, args=[])
-                g['ims_miso_avg'] = ims_miso_avg
-                print('Calculated: ims_miso_avg')
+            # # Find average misorientation per boundary pixel
+            # if 'ims_miso_avg' not in g.keys():
+            #     if np.all(ims_miso==None): ims_miso = g['ims_miso']
+            #     func = mean_wo_zeros
+            #     ims_miso_avg = iterate_function(ims_miso, func, args=[])
+            #     g['ims_miso_avg'] = ims_miso_avg
+            #     print('Calculated: ims_miso_avg')
             
-            # Find misorientation images using the SPPARKS method
-            if 'ims_miso_spparks' not in g.keys():
-                args = [miso_matrix[None,]]
-                func = neighborhood_miso_spparks
-                ims_miso_spparks = iterate_function(d, func, args)[:,0]
-                g['ims_miso_spparks'] = ims_miso_spparks
-                print('Calculated: ims_miso_spparks')
-            else: ims_miso_spparks = None
+            # # Find misorientation images using the SPPARKS method
+            # if 'ims_miso_spparks' not in g.keys():
+            #     args = [miso_matrix[None,]]
+            #     func = neighborhood_miso_spparks
+            #     ims_miso_spparks = iterate_function(d, func, args)[:,0]
+            #     g['ims_miso_spparks'] = ims_miso_spparks
+            #     print('Calculated: ims_miso_spparks')
+            # else: ims_miso_spparks = None
                 
-            # Find average misorientation per boundary pixel using the SPPARKS method
-            if 'ims_miso_spparks_avg' not in g.keys():
-                if np.all(ims_miso_spparks==None): ims_miso_spparks = g['ims_miso_spparks']
-                func = mean_wo_zeros
-                ims_miso_spparks_avg = iterate_function(ims_miso_spparks, func, args=[])
-                g['ims_miso_spparks_avg'] = ims_miso_spparks_avg
-                print('Calculated: ims_miso_spparks_avg')
+            # # Find average misorientation per boundary pixel using the SPPARKS method
+            # if 'ims_miso_spparks_avg' not in g.keys():
+            #     if np.all(ims_miso_spparks==None): ims_miso_spparks = g['ims_miso_spparks']
+            #     func = mean_wo_zeros
+            #     ims_miso_spparks_avg = iterate_function(ims_miso_spparks, func, args=[])
+            #     g['ims_miso_spparks_avg'] = ims_miso_spparks_avg
+            #     print('Calculated: ims_miso_spparks_avg')
                 
             # # Find dihedral angle standard deviation
             # if 'dihedral_std' not in g.keys():
@@ -1837,71 +1862,71 @@ def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=T
     plt.savefig('./plots/number_sides_distribution', dpi=300)
     if if_show: plt.show()
         
-    # Plot average misorientation per bounday pixel
-    log = []
-    for i in tqdm(range(len(hps)),'Plotting average miso'):
-        with h5py.File(hps[i], 'r') as f: 
-            ims_miso_avg = f[gps[i]+'/ims_miso_avg'][:]
-        log.append(ims_miso_avg)
+    # # Plot average misorientation per bounday pixel
+    # log = []
+    # for i in tqdm(range(len(hps)),'Plotting average miso'):
+    #     with h5py.File(hps[i], 'r') as f: 
+    #         ims_miso_avg = f[gps[i]+'/ims_miso_avg'][:]
+    #     log.append(ims_miso_avg)
     
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(log[i], c=c[i%len(c)])
-        legend.append('')
-    plt.title('Average miso per boundary pixel')
-    plt.xlabel('Number of frames')
-    plt.ylabel('Average miso per boundary pixel')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/avg_miso_time', dpi=300)
-    if if_show: plt.show()
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(log[i], c=c[i%len(c)])
+    #     legend.append('')
+    # plt.title('Average miso per boundary pixel')
+    # plt.xlabel('Number of frames')
+    # plt.ylabel('Average miso per boundary pixel')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/avg_miso_time', dpi=300)
+    # if if_show: plt.show()
     
-    # Plot scaled average misorientation per bounday pixel
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
-        plt.xlim([np.max(xs[i]), np.min(xs[i])])
-        legend.append('')
-    plt.title('Average miso per boundary pixel (scaled)')
-    plt.xlabel('Number of grains')
-    plt.ylabel('Average miso per boundary pixel')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/avg_miso_time_scaled', dpi=300)
-    if if_show: plt.show()
+    # # Plot scaled average misorientation per bounday pixel
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
+    #     plt.xlim([np.max(xs[i]), np.min(xs[i])])
+    #     legend.append('')
+    # plt.title('Average miso per boundary pixel (scaled)')
+    # plt.xlabel('Number of grains')
+    # plt.ylabel('Average miso per boundary pixel')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/avg_miso_time_scaled', dpi=300)
+    # if if_show: plt.show()
     
-    # Plot average misorientation per bounday pixel (SPPARKS)
-    log = []
-    for i in tqdm(range(len(hps)),'Plotting average spparks miso'):
-        with h5py.File(hps[i], 'r') as f: 
-            ims_miso_spparks_avg = f[gps[i]+'/ims_miso_spparks_avg'][:]
-        log.append(ims_miso_spparks_avg)
+    # # Plot average misorientation per bounday pixel (SPPARKS)
+    # log = []
+    # for i in tqdm(range(len(hps)),'Plotting average spparks miso'):
+    #     with h5py.File(hps[i], 'r') as f: 
+    #         ims_miso_spparks_avg = f[gps[i]+'/ims_miso_spparks_avg'][:]
+    #     log.append(ims_miso_spparks_avg)
     
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(log[i], c=c[i%len(c)])
-        legend.append('')
-    plt.title('Average miso per boundary pixel (SPPARKS)')
-    plt.xlabel('Number of frames')
-    plt.ylabel('Average miso per boundary pixel')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/avg_miso_spparks_time', dpi=300)
-    if if_show: plt.show()
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(log[i], c=c[i%len(c)])
+    #     legend.append('')
+    # plt.title('Average miso per boundary pixel (SPPARKS)')
+    # plt.xlabel('Number of frames')
+    # plt.ylabel('Average miso per boundary pixel')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/avg_miso_spparks_time', dpi=300)
+    # if if_show: plt.show()
     
-    # Plot scaled average misorientation per bounday pixel (SPPARKS)
-    plt.figure()
-    legend = []
-    for i in range(len(hps)):
-        plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
-        plt.xlim([np.max(xs[i]), np.min(xs[i])])
-        legend.append('')
-    plt.title('Average miso per boundary pixel (SPPARKS, scaled)')
-    plt.xlabel('Number of grains')
-    plt.ylabel('Average miso per boundary pixel')
-    if legend==True: plt.legend(legend)
-    plt.savefig('./plots/avg_miso_spparks_time_scaled', dpi=300)
-    if if_show: plt.show()
+    # # Plot scaled average misorientation per bounday pixel (SPPARKS)
+    # plt.figure()
+    # legend = []
+    # for i in range(len(hps)):
+    #     plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
+    #     plt.xlim([np.max(xs[i]), np.min(xs[i])])
+    #     legend.append('')
+    # plt.title('Average miso per boundary pixel (SPPARKS, scaled)')
+    # plt.xlabel('Number of grains')
+    # plt.ylabel('Average miso per boundary pixel')
+    # if legend==True: plt.legend(legend)
+    # plt.savefig('./plots/avg_miso_spparks_time_scaled', dpi=300)
+    # if if_show: plt.show()
     
     # # Plot dihedral angle distribution standard deviation over time
     # log = []
@@ -2413,7 +2438,7 @@ def num_diff_neighbors(ims, window_size=3, pad_mode='circular'):
         
     if pad_mode==None: s = ims.shape[:2]+tuple(np.array(ims.shape[2:])-window_size+1)
     else: s = ims.shape
-    ims_diff = torch.cat(log).reshape(s) #misorientation image
+    ims_diff = torch.cat(log, dim=1).reshape(s) #misorientation image
     
     
     #delete this later
@@ -2498,7 +2523,7 @@ def compute_energy_labels_gen(im_seq, batch_sz, act_dim=9, energy_dim=3, pad_mod
     #Find parameters
     num_fut = im_seq.shape[0]-1 #number of future steps
     d = im_seq.dim()-2 #number of dimensions
-    stride = [num_fut,1,1] 
+    stride = [num_fut,]+[1,]*d 
     num_iter = int(np.ceil(np.prod(im_seq.shape[1:])/batch_sz))
     
     #Find current energy

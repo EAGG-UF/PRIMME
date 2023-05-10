@@ -112,11 +112,11 @@ class PRIMME(nn.Module):
             self.miso_matrix = None
             self.miso_matrix_val = None
         
-        #Calculate batch size to maintain memory usage limit 
-        unfold_mem_lim = 48e9
-        num_future = self.im_seq.shape[0]-1 #number of future steps
-        self.batch_sz = int(unfold_mem_lim/((num_future)*self.act_dim**self.num_dims*self.energy_dim**self.num_dims*64)) #set to highest memory functions - "compute_energy_labels_gen"
-        self.num_iter = int(np.ceil(np.prod(self.im_seq.shape[1:])/self.batch_sz))
+        # #Calculate batch size to maintain memory usage limit 
+        # unfold_mem_lim = 48e9
+        # num_future = self.im_seq.shape[0]-1 #number of future steps
+        # self.batch_sz = int(unfold_mem_lim/((num_future)*self.act_dim**self.num_dims*self.energy_dim**self.num_dims*64)) #set to highest memory functions - "compute_energy_labels_gen"
+        # self.num_iter = int(np.ceil(np.prod(self.im_seq.shape[1:])/self.batch_sz))
         
         # #Compute features 
         # self.features_gen = fs.compute_features_gen(self.im_seq[0:1,], self.batch_sz, self.obs_dim, self.pad_mode)
@@ -201,24 +201,29 @@ class PRIMME(nn.Module):
         return self.im_next
     
 
-    def step(self, im_seq, miso_matrix=None):
+    def step(self, im_seq, miso_matrix=None, unfold_mem_lim=.1e9):
         #"im_seq" can be of shape=[1,1,dim0,dim1,dim2] or a sequence of shape=[num_future, 1, dim0, dim1, dim2]
         #Find the image after "im" given the trained model
         #Also calculates loss and accurate if given an image sequence
         #Calculates misorientation features of "miso_matrix" is given
         
+        #Calculate batch size to maintain memory usage limit 
+        num_future = im_seq.shape[0] #number of future steps
+        batch_sz = int(unfold_mem_lim/((num_future)*self.act_dim**self.num_dims*self.energy_dim**self.num_dims*64)) #set to highest memory functions - "compute_energy_labels_gen"
+        num_iter = int(np.ceil(np.prod(im_seq.shape[1:])/batch_sz))
+        
         # Initialize variables and generators
         im = im_seq[0:1,]
         num_future = im_seq.shape[0]-1
         if num_future>0: 
-            labels_gen = fs.compute_labels_gen(im_seq, self.batch_sz, self.act_dim, self.energy_dim, self.reg, self.pad_mode)
-            im_next_true_split = im_seq[1:2,].flatten().split(self.batch_sz)
+            labels_gen = fs.compute_labels_gen(im_seq, batch_sz, self.act_dim, self.energy_dim, self.reg, self.pad_mode)
+            im_next_true_split = im_seq[1:2,].flatten().split(batch_sz)
         
-        im_unfold_gen = fs.unfold_in_batches(im[0,0], self.batch_sz, [self.obs_dim,]*self.num_dims, [1,]*self.num_dims, self.pad_mode)
+        im_unfold_gen = fs.unfold_in_batches(im[0,0], batch_sz, [self.obs_dim,]*self.num_dims, [1,]*self.num_dims, self.pad_mode)
         if miso_matrix is None:
-            features_gen = fs.compute_features_gen(im, self.batch_sz, self.obs_dim, self.pad_mode)
+            features_gen = fs.compute_features_gen(im, batch_sz, self.obs_dim, self.pad_mode)
         else: 
-            features_gen = fs.compute_features_miso_gen(im, self.batch_sz, self.miso_matrix, self.obs_dim, self.pad_mode)
+            features_gen = fs.compute_features_miso_gen(im, batch_sz, miso_matrix, self.obs_dim, self.pad_mode)
         
         # Find next image
         action_likelyhood = torch.zeros((self.act_dim,)*self.num_dims)
@@ -227,7 +232,9 @@ class PRIMME(nn.Module):
         accuracy = 0
         num_features = 0
         im_next_log = []
-        for i in range(self.num_iter):
+        for i in range(num_iter):
+            
+            print(i)
             
             # Only use neighborhoods that have more than one ID (have a potential to change ID)
             im_unfold = next(im_unfold_gen).reshape(-1, self.obs_dim**self.num_dims)
@@ -235,8 +242,7 @@ class PRIMME(nn.Module):
             current_ids = im_unfold[:,mid_i]
             use_i = (im_unfold != current_ids[:,None]).sum(1).nonzero()[:,0]
             
-            
-            # use_i = torch.Tensor([1,1]).to(device).long()
+            print(len(use_i))
             
             if len(use_i)==1: 
                 add_i = (use_i+1)%im_unfold.shape[0] #keep the next index whether or not it has all the same IDs
@@ -264,8 +270,6 @@ class PRIMME(nn.Module):
                 
         # Concatenate batches to form next image (as predicted)
         im_next = torch.cat(im_next_log).reshape(im.shape)
-        
-        if num_features==0: print('found a zero')
         
         # Find average of loss and accuracy
         if num_future>0: 
@@ -549,25 +553,66 @@ def train_primme(trainset, num_eps, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_
     return modelname
 
 
-def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', batch_dims=[2000,2000], plot_freq=None):
+def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', plot_freq=None, if_miso=False):
     
-    
-    
-    # Setup
+    # Setup variables
     agent = PRIMME().to(device)
     agent.load_state_dict(torch.load(modelname))
     agent.pad_mode = pad_mode
     im = torch.Tensor(ic).unsqueeze(0).unsqueeze(0).float().to(device)
+    if miso_array is None: miso_array = fs.find_misorientation(ea, mem_max=1) 
+    miso_matrix = fs.miso_array_to_matrix(torch.from_numpy(miso_array[None,])).to(device)
     size = ic.shape
     dims = len(size)
     ngrain = len(torch.unique(im))
     tmp = np.array([8,16,32], dtype='uint64')
     dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
-    if np.all(miso_array==None): miso_array = fs.find_misorientation(ea, mem_max=1) 
-    miso_matrix = fs.miso_array_to_matrix(torch.from_numpy(miso_array[None,])).to(device)
     append_name = modelname.split('_kt')[1]
     sz_str = ''.join(['%dx'%i for i in size])[:-1]
     fp_save = './data/primme_sz(%s)_ng(%d)_nsteps(%d)_freq(1)_kt%s'%(sz_str,ngrain,nsteps,append_name)
+    
+    
+    # Simulate and store in H5
+    with h5py.File(fp_save, 'a') as f:
+        
+        # If file already exists, create another group in the file for this simulaiton
+        num_groups = len(f.keys())
+        hp_save = 'sim%d'%num_groups
+        g = f.create_group(hp_save)
+        
+        # Save data
+        s = list(im.shape); s[0] = nsteps + 1
+        dset = g.create_dataset("ims_id", shape=s, dtype=dtype)
+        dset2 = g.create_dataset("euler_angles", shape=ea.shape)
+        dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
+        dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
+        dset[0] = im[0].cpu()
+        dset2[:] = ea
+        dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
+        dset4[:] = miso_matrix.cpu() #same values as mis0_array, different format
+        
+        for i in tqdm(range(nsteps), 'Running PRIMME simulation: '):
+            
+            # Simulate
+            if if_miso: im_next = agent.step(im, miso_matrix)
+            else: im_next = agent.step(im)
+            im = im_next.clone()
+
+            #Store
+            dset[i+1,:] = im[0].cpu()
+            
+            #Plot
+            if plot_freq is not None: 
+                if i%plot_freq==0:
+                    if dims==2: 
+                        plt.imshow(im[0,0,].cpu()); plt.show()
+                        
+    return fp_save
+    
+    
+    
+    
+    
     
     # Run simulation
     # ims_id = im
@@ -583,56 +628,56 @@ def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', 
         #save images one at a atime in an h5 file
         
         
-    #assumes 2d for now too, just update the "c"s later #!!!
-    with h5py.File(fp_save, 'a') as f:
+    #assumes 2d for now too, just update the "c"s later 
+    # with h5py.File(fp_save, 'a') as f:
         
-        # If file already exists, create another group in the file for this simulaiton
-        num_groups = len(f.keys())
-        hp_save = 'sim%d'%num_groups
-        g = f.create_group(hp_save)
+    #     # If file already exists, create another group in the file for this simulaiton
+    #     num_groups = len(f.keys())
+    #     hp_save = 'sim%d'%num_groups
+    #     g = f.create_group(hp_save)
         
-        # Save data
-        s = list(im.shape); s[0] = nsteps
-        dset = g.create_dataset("ims_id", shape=s, dtype=dtype)
-        dset2 = g.create_dataset("euler_angles", shape=ea.shape)
-        dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
-        dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
-        dset2[:] = ea
-        dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
-        dset4[:] = miso_matrix.cpu() #same values as mis0_array, different format
+    #     # Save data
+    #     s = list(im.shape); s[0] = nsteps
+    #     dset = g.create_dataset("ims_id", shape=s, dtype=dtype)
+    #     dset2 = g.create_dataset("euler_angles", shape=ea.shape)
+    #     dset3 = g.create_dataset("miso_array", shape=miso_array.shape)
+    #     dset4 = g.create_dataset("miso_matrix", shape=miso_matrix.shape)
+    #     dset2[:] = ea
+    #     dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
+    #     dset4[:] = miso_matrix.cpu() #same values as mis0_array, different format
         
-        batch_dims = [np.clip(b, 0, int(2*size[i]/3)) for i, b in enumerate(batch_dims)]
-        aaa = torch.Tensor(size/np.array(batch_dims)).long()+1
-        bbb = torch.stack(torch.meshgrid([torch.arange(aa) for aa in aaa])).reshape(2,-1).T.numpy()
-        n=8+3
-        for i in tqdm(range(nsteps), 'Running PRIMME simulation: '):
+    #     batch_dims = [np.clip(b, 0, int(2*size[i]/3)) for i, b in enumerate(batch_dims)]
+    #     aaa = torch.Tensor(size/np.array(batch_dims)).long()+1
+    #     bbb = torch.stack(torch.meshgrid([torch.arange(aa) for aa in aaa])).reshape(2,-1).T.numpy()
+    #     n=8+3
+    #     for i in tqdm(range(nsteps), 'Running PRIMME simulation: '):
             
-            im_next = im.clone()
+    #         im_next = im.clone()
             
-            for j in bbb:
+    #         for j in bbb:
                 
-                mi = j*np.array(batch_dims) - n
-                ma = (np.clip((j+1)*np.array(batch_dims), np.zeros(2), size) + n)%size
-                slices_txt = ':,:,%d:%d,%d:%d'%(mi[0],ma[0],mi[1],ma[1])
-                batch = fs.wrap_slice(im, slices_txt)
+    #             mi = j*np.array(batch_dims) - n
+    #             ma = (np.clip((j+1)*np.array(batch_dims), np.zeros(2), size) + n)%size
+    #             slices_txt = ':,:,%d:%d,%d:%d'%(mi[0],ma[0],mi[1],ma[1])
+    #             batch = fs.wrap_slice(im, slices_txt)
                 
-                batch_p = agent.step(batch.clone(), miso_matrix, evaluate=False)
+    #             batch_p = agent.step(batch.clone(), miso_matrix, evaluate=False)
                 
-                strs = [str(int(mi[0]+n)),str(int(ma[0]-n)),str(int(mi[1]+n)),str(int(ma[1]-n))]
-                for k in range(len(strs)): 
-                    if strs[k]=='0': strs[k]=''
-                exec('im_next[:,:,%s:%s,%s:%s]=batch_p'%tuple(strs))
+    #             strs = [str(int(mi[0]+n)),str(int(ma[0]-n)),str(int(mi[1]+n)),str(int(ma[1]-n))]
+    #             for k in range(len(strs)): 
+    #                 if strs[k]=='0': strs[k]=''
+    #             exec('im_next[:,:,%s:%s,%s:%s]=batch_p'%tuple(strs))
             
-            im = im_next
+    #         im = im_next
             
-            #Store
-            dset[i,:] = im[0].cpu()
+    #         #Store
+    #         dset[i,:] = im[0].cpu()
             
-            #Plot
-            if plot_freq is not None: 
-                if i%plot_freq==0:
-                    if dims==2: 
-                        plt.imshow(im[0,0,].cpu()); plt.show()
+    #         #Plot
+    #         if plot_freq is not None: 
+    #             if i%plot_freq==0:
+    #                 if dims==2: 
+    #                     plt.imshow(im[0,0,].cpu()); plt.show()
             
             
             
@@ -675,4 +720,4 @@ def run_primme(ic, ea, nsteps, modelname, miso_array=None, pad_mode='circular', 
     #     dset3[:] = miso_array #radians (does not save the exact "Miso.txt" file values, which are degrees divided by the cutoff angle)
     #     dset4[:] = miso_matrix #same values as mis0_array, different format
 
-    return fp_save
+    
