@@ -14,10 +14,18 @@ import PRIMME as fsp
 
 
 
-fps = ['./data/spparks_sz(128x128x128)_ng(8192)_nsteps(100)_freq(0.1)_kt(0.66)_cut(0).h5',
-        './data/primme_sz(128x128x128)_ng(8192)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5']
-fs.make_time_plots(fps) 
 
+#NEXT WEEK
+#Save to github
+#Upload all files to Hipergator
+
+#3D runs
+#0 - Normal (93, 256 - 17, 1000 - 128, 680)
+#1 - (64, 256 - 7, 1000 - 128, 8192)
+#2 - (93, 256 - 7, 1000 - 128, 8192)
+#3 - 0 but with zero mean loss
+#Try mode weigthing labels
+#Try gaussian overlay labels
 
 
 
@@ -27,8 +35,9 @@ fs.make_time_plots(fps)
 
 ### Train PRIMME using the above training set from SPPARKS
 # trainset_location = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
-trainset_location = "./data/trainset_spparks_sz(93x93x93)_ng(256-256)_nsets(200)_future(4)_max(50)_kt(0.66)_freq(0.5)_cut(0).h5"
-model_location = fsp.train_primme(trainset_location, num_eps=100, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode='circular', plot_freq=20)
+# trainset_location = "./data/trainset_spparks_sz(93x93x93)_ng(256-256)_nsets(200)_future(4)_max(50)_kt(0.66)_freq(0.5)_cut(0).h5"
+trainset_location = "./data/trainset_spparks_sz(64x64x64)_ng(1024-1024)_nsets(200)_future(4)_max(10)_kt(0.66)_freq(0.1)_cut(0).h5"
+model_location = fsp.train_primme(trainset_location, num_eps=1000, obs_dim=7, act_dim=7, lr=5e-5, reg=1, pad_mode='circular', plot_freq=1)
 
 
 
@@ -41,40 +50,37 @@ model_location = fsp.train_primme(trainset_location, num_eps=100, obs_dim=17, ac
     
     
     
-# np.cbrt(93**3/256*3/4/np.pi)
-# np.sqrt(256**2/256/np.pi)
-
-# np.cbrt(234**3/4096*3/4/np.pi)
-# np.sqrt(1024**2/4096/np.pi)
 
 
 
-ic, ea, _ = fs.voronoi2image(size=[234,]*3, ngrain=4096, memory_limit=12e9, p=2)
+ic, ea, _ = fs.voronoi2image(size=[128,]*3, ngrain=4096, memory_limit=12e9, p=2)
+
+# ic, ea, _ = fs.voronoi2image(size=[1024,]*2, ngrain=4096, memory_limit=12e9, p=2)
 
 
 
-
-model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(100)_kt(0.66)_cut(0).h5"
-fp_primme = fsp.run_primme(ic, ea, nsteps=200, modelname=model_location, pad_mode='circular', plot_freq=20)
+model_location = "./data/model_dim(3)_sz(17_17)_lr(5e-05)_reg(1)_ep(1000)_kt(0.66)_freq(0.5)_cut(0).h5"
+# model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(1000)_kt(0.66)_cut(0).h5"
+fp_primme = fsp.run_primme(ic, ea, nsteps=200, modelname=model_location, pad_mode='circular', plot_freq=1)
 fs.compute_grain_stats(fp_primme)
 # fs.make_videos(fp_primme) #saves to 'plots'
 fs.make_time_plots(fp_primme) 
 
 
-#Small circle
-ic, ea = fs.generate_circleIC(size=[256,256], r=64)
-fp_primme = fsp.run_primme(ic, ea, nsteps=500, modelname=model_location, pad_mode='circular', plot_freq=50)
-fs.circle_stats(fp_primme)
-# fs.circle_videos(fp_primme)
-fs.circle_plots(fp_primme)
+# #Small circle
+# ic, ea = fs.generate_circleIC(size=[256,256], r=64)
+# fp_primme = fsp.run_primme(ic, ea, nsteps=500, modelname=model_location, pad_mode='circular', plot_freq=50)
+# fs.circle_stats(fp_primme)
+# # fs.circle_videos(fp_primme)
+# fs.circle_plots(fp_primme)
 
 
-#Large circle
-ic, ea = fs.generate_circleIC(size=[512,512], r=200)
-fp_primme = fsp.run_primme(ic, ea, nsteps=1000, modelname=model_location, pad_mode='circular', plot_freq=50)
-fs.circle_stats(fp_primme)
-# fs.circle_videos(fp_primme)
-fs.circle_plots(fp_primme)
+# #Large circle
+# ic, ea = fs.generate_circleIC(size=[512,512], r=200)
+# fp_primme = fsp.run_primme(ic, ea, nsteps=1000, modelname=model_location, pad_mode='circular', plot_freq=50)
+# fs.circle_stats(fp_primme)
+# # fs.circle_videos(fp_primme)
+# fs.circle_plots(fp_primme)
 
 
 
@@ -103,6 +109,10 @@ fs.circle_plots(fp_primme)
 # fps = ['./data/sims/spparks_sz(256x256)_ng(2)_nsteps(500)_freq(1.0)_kt(0.66)_cut(0).h5',
 #         './data/sims/primme_sz(256x256)_ng(2)_nsteps(500)_freq(1)_kt(0.66)_cut(0)_0.h5']
 # fs.circle_plots(fps)
+
+
+
+
 
 
 
