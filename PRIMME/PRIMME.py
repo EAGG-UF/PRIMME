@@ -107,7 +107,12 @@ class PRIMME:
             predictions = torch.Tensor(self.model.predict_on_batch(e.cpu().numpy())).to(self.device)
             # predictions = self.model(e)
             
-            action_values = torch.argmax(predictions, dim=1)
+            
+            tmp = torch.rand(predictions.shape).to(predictions.device)/1e9
+            action_values = (predictions+tmp).argmax(1)
+            
+            
+            # action_values = torch.argmax(predictions, dim=1)
             
             if evaluate==True: 
                 predictions_split.append(predictions)
