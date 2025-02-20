@@ -11,7 +11,7 @@ CONTRIBUTORS:
 
 AFFILIATIONS:
 	1. University of Florida, SmartDATA Lab, Department of Electrical and Computer Engineering
-	2. University of Florida, Tonks Research Group, Department of Material Science and Engineering
+	2. University of Florida, Tonks Research Group, Department of Materials Science and Engineering
 
 FUNDING SPONSORS:
 	U.S. Department of Energy, Office of Science, Basic Energy Sciences under Award \#DE-SC0020384
