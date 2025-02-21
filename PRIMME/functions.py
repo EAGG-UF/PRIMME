@@ -275,7 +275,7 @@ def image2init(img, EulerAngles, fp=None):
     size = img.shape
     dim = len(img.shape)
     if fp==None: fp = r"./spparks_simulations/spparks.init"
-    IC = [0]*(np.product(size)+3)
+    IC = [0]*(np.prod(size)+3)
     
     # Write the information in the SPPARKS format and save the file
     IC[0] = '# This line is ignored\n'
@@ -574,7 +574,7 @@ def process_dump(path_to_dump='./spparks_simulations/spparks.dump'):
     # Find euler angles per ID
     num_grains = int(np.max(item_data[3][0,:,1]))
     euler_angles = np.zeros([num_grains,3])
-    for i in range(np.product(dims)):
+    for i in range(np.prod(dims)):
         ii = int(item_data[3][0,i,1])-1
         ea = item_data[3][0,i,2:-1]
         euler_angles[ii] = ea
@@ -1110,7 +1110,7 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     with h5py.File(hps[0], 'r') as f:
         g = f[gps[0]]
         #print(g.keys())
-        total_area = np.product(g['ims_id'].shape[1:])
+        total_area = np.prod(g['ims_id'].shape[1:])
         ngrains = g['grain_areas'].shape[1]
         lim = total_area/(ngrains*scale_ngrains_ratio)
     
@@ -1333,7 +1333,7 @@ def compute_energy_labels(im_seq, act_dim=9, pad_mode="circular"):
     energy_change = torch.cat(energy_changes, dim=2)
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(1,1,-1).to(im_seq.device)
-    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((np.product(size),)+(act_dim,)*(len(size)-1))
+    energy_labels = torch.sum(energy_change*decay, dim=2).transpose(0,1).reshape((np.prod(size),)+(act_dim,)*(len(size)-1))
     
     return energy_labels
 
@@ -1353,7 +1353,7 @@ def compute_action_labels(im_seq, act_dim=9, pad_mode="circular"):
     actions_marked = window_act.unsqueeze(0).expand(4,-1,-1)==ims_next_flat.unsqueeze(1) #Mark the actions that matches each future image (the "action taken")
     decay_rate = 1/2
     decay = decay_rate**torch.arange(1,im_seq.shape[0]).reshape(-1,1,1).to(im.device)
-    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((np.product(size),)+(act_dim,)*(len(size)-1))
+    action_labels = torch.sum(actions_marked*decay, dim=0).transpose(0,1).reshape((np.prod(size),)+(act_dim,)*(len(size)-1))
     
     return action_labels
 
@@ -1370,7 +1370,7 @@ def compute_labels(im_seq, obs_dim=9, act_dim=9, reg=1, pad_mode="circular"):
 def compute_features(im, obs_dim=9, pad_mode='circular'):
     size = im.shape[1:]
     local_energy = num_diff_neighbors(im, window_size=7, pad_mode=pad_mode)
-    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.product(size),)+(obs_dim,)*(len(size)-1))
+    features = my_unfoldNd(local_energy.float(), obs_dim, pad_mode=pad_mode).T.reshape((np.prod(size),)+(obs_dim,)*(len(size)-1))
     return features
 
 

@@ -346,7 +346,7 @@ def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad
     
     # Setup
     agent = PRIMME(pad_mode=pad_mode, mode = mode, device = device).to(device)
-    agent.load_state_dict(torch.load(modelname))
+    agent.load_state_dict(torch.load(modelname, map_location=torch.device('cpu')))
     im = torch.Tensor(ic).unsqueeze(0).unsqueeze(0).float()
     ngrain = len(torch.unique(im))
     tmp = np.array([8,16,32], dtype='uint64')
