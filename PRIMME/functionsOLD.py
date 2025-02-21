@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 from unfoldNd import unfoldNd 
 #from PRIMME import PRIMME
 import matplotlib.colors as mcolors
-import pickle
-from pathlib import Path
+
+
 ### Script
 
 fp = './data/'
@@ -28,8 +28,8 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
-device=torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-
+device=torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+#device = 'cpu'
 ### General
 
 def check_exist(fps):
@@ -48,8 +48,7 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
     
     for i in range(len(hps)):
         with h5py.File(hps[i], 'r') as f:
-            print(f.keys())
-            print(f['sim0'].keys())
+            
             if not gps[i] in f.keys():
                 if if_bool: return False
                 else: raise Exception('Group does not exist: %s/%s'%(hps[i], gps[i]))
@@ -60,29 +59,6 @@ def check_exist_h5(hps, gps, dts, if_bool=False):
                     else: raise Exception('Dataset does not exist: %s/%s/%s'%(hps[i], gps[i], d))
                     
     if if_bool: return True
-
-def save_picke_files(save_dir, filename_save, dataset):
-
-    save_dir.mkdir(parents = True, exist_ok = True)
-    path_save = save_dir.joinpath(filename_save)
-    
-    with open(path_save, 'wb') as handle:
-        pickle.dump(dataset, handle, protocol = pickle.HIGHEST_PROTOCOL)        
-    print(path_save, "has been created\n")
-    
-def load_picke_files(load_dir, filename_save):
-
-    path_load = load_dir.joinpath(filename_save)
-
-    if os.path.isfile(str(path_load)):  
-        print(path_load, "start to be loaded\n")
-        with open(path_load , 'rb') as handle:
-            dataset = pickle.load(handle)         
-        print(path_load, "has been created\n") 
-    else:
-        print("please create " + str(path_load)) 
-    
-    return dataset
 
 ### Create initial conditions
 
@@ -99,6 +75,13 @@ def generate_circleIC(size=[512,512], r=64):
     euler_angles = np.pi*torch.rand((2,3))*torch.Tensor([2,0.5,2])
     return img.numpy(), euler_angles.numpy()
 
+def generate_SquareIC(size=[512,512], r=64):
+    c = (torch.Tensor(size)-1)/2
+    a1 = torch.arange(size[0]).unsqueeze(1).repeat(1, size[1])
+    a2 = torch.arange(size[1]).unsqueeze(0).repeat(size[0], 1)
+    img = ((np.abs(c[0]-a1) < r) & (np.abs(c[1]-a2) <r)).float()
+    euler_angles = np.pi*torch.rand((2,3))*torch.Tensor([2,0.5,2])
+    return img.numpy(), euler_angles.numpy()
 
 def generate_sphereIC(size=[512,512,512], r=200):
     c = (torch.Tensor(size)-1)/2
@@ -109,13 +92,6 @@ def generate_sphereIC(size=[512,512,512], r=200):
     euler_angles = np.pi*torch.rand((2,3))*torch.Tensor([2,0.5,2])
     return img.numpy(), euler_angles.numpy()
 
-def generate_SquareIC(size=[512,512], r=64):
-    c = (torch.Tensor(size)-1)/2
-    a1 = torch.arange(size[0]).unsqueeze(1).repeat(1, size[1])
-    a2 = torch.arange(size[1]).unsqueeze(0).repeat(size[0], 1)
-    img = ((np.abs(c[0]-a1) < r) & (np.abs(c[1]-a2) <r)).float()
-    euler_angles = np.pi*torch.rand((2,3))*torch.Tensor([2,0.5,2])
-    return img.numpy(), euler_angles.numpy()
 
 def generate_3grainIC(size=[512,512], h=350):
     img = torch.ones(size)
@@ -238,27 +214,6 @@ def voronoi2image(size=[128, 64, 32], ngrain=512, memory_limit=1e9, p=2, center_
     else: 
         print("Available Memory: %d - Increase memory limit"%available_memory)
         return None, None, None
-
-def generate_train_init(filename, grain_shape, grain_sizes, device, miso_array = None):
-    
-    if grain_shape == "circular": 
-        ic, ea = generate_circleIC(size = grain_sizes[0], r = grain_sizes[1]) #nsteps=200, pad_mode='circular'
-    elif grain_shape == "square":
-        ic, ea = generate_SquareIC(size = grain_sizes[0], r = grain_sizes[1]) 
-    elif grain_shape == "hex":
-        ic, ea = generate_hexIC() #nsteps=500, pad_mode='circular'
-    elif grain_shape == "grain":
-        if grain_sizes[0][0] * grain_sizes[0][0] > 2024 * 2024:
-            device = 'cpu'
-        ic, ea, _ = voronoi2image(size = grain_sizes[0], ngrain = grain_sizes[1], device = device) #nsteps=500, pad_mode='circular'
-    
-    if np.all(miso_array==None): miso_array = find_misorientation(ea, mem_max=1) 
-    miso_matrix = miso_conversion(torch.from_numpy(miso_array[None,]))[0]    
-    
-    data_dict = {"ic": ic, "ea": ea, "miso_array": miso_array, "miso_matrix": miso_matrix}
-    save_picke_files(save_dir = Path('./data'), filename_save = filename, dataset = data_dict)
-    
-    return ic, ea, miso_array, miso_matrix 
 
 ### Run and read SPPARKS
 
@@ -1004,6 +959,7 @@ def iterate_function(array, func, args=[], device=device):
         log.append(tmp)
     return np.stack(log)
 
+
 def compute_grain_stats(hps, gps='sim0', device=device):
     
     #Make 'hps' and 'gps' a list if it isn't already
@@ -1021,10 +977,12 @@ def compute_grain_stats(hps, gps='sim0', device=device):
             
         with h5py.File(hp, 'a') as f:
             
+            #print(hps[i])
             # Setup
             g = f[gp]
             d = g['ims_id']
             max_id = g['euler_angles'].shape[0] - 1
+            #print(g.keys())
             
             # Find number of pixels per grain
             if 'grain_areas' not in g.keys():
@@ -1060,7 +1018,8 @@ def compute_grain_stats(hps, gps='sim0', device=device):
                 g['grain_sides_avg'] = grain_sides_avg
                 print('Calculated: grain_sides_avg')
 
-def make_videos(hps, sub_folder, ic_shape, gps='sim0'):
+
+def make_videos(hps, gps='sim0'):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already
@@ -1068,17 +1027,22 @@ def make_videos(hps, sub_folder, ic_shape, gps='sim0'):
     if type(gps)!=list: gps = [gps]
     
     # Make sure all needed datasets exist
-    #dts=['ims_id', 'ims_miso', 'ims_miso_spparks']
-    #check_exist_h5(hps, gps, dts)  
+    # dts=['ims_id', 'ims_miso', 'ims_miso_spparks']
+    # check_exist_h5(hps, gps, dts)  
+    
     for i in tqdm(range(len(hps)), "Making videos"):
         with h5py.File(hps[i], 'a') as f:
+            print(f['sim0'].keys())
+            
             g = f[gps[i]]
+            
             ims = g['ims_id'][:,0]
             ims = (255/np.max(ims)*ims).astype(np.uint8)
-            imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), ims)
-            imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), ims)
+            imageio.mimsave('./plots/%s_ims_id%d.mp4'%(("").join(hps[i].split("/")[2].split(".")[:2]), i), ims)
+            imageio.mimsave('./plots/%s_ims_id%d.gif'%(("").join(hps[i].split("/")[2].split(".")[:2]), i), ims)
 
-def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None):
+        
+def make_time_plots(hps, gps='last', scale_ngrains_ratio=0.05, cr=None, legend=True):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already, and set default 'gps'
@@ -1089,9 +1053,8 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
         for hp in hps:
             with h5py.File(hp, 'r') as f:
                 gps.append(list(f.keys())[-1])
-                print(f.keys())
         print('Last groups in each h5 file chosen:')
-        #print(gps)        
+        print(gps)
     else:
         if type(gps)!=list: gps = [gps]
     
@@ -1109,7 +1072,6 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     # Calculate scale limit
     with h5py.File(hps[0], 'r') as f:
         g = f[gps[0]]
-        #print(g.keys())
         total_area = np.product(g['ims_id'].shape[1:])
         ngrains = g['grain_areas'].shape[1]
         lim = total_area/(ngrains*scale_ngrains_ratio)
@@ -1120,6 +1082,7 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     ps = []
     rs = []
     for i in tqdm(range(len(hps)),'Calculating avg grain areas'):
+        
         with h5py.File(hps[i], 'r') as f: 
             grain_areas_avg = f[gps[i]+'/grain_areas_avg'][:]
         log.append(grain_areas_avg)
@@ -1135,16 +1098,16 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
         rs.append(r)
     
     plt.figure()
+    legend = []
     for i in range(len(hps)):
         plt.plot(log[i], c=c[i%len(c)])
         legend.append('Slope: %.3f | R2: %.3f'%(ps[i][0], rs[i]))
     plt.title('Average grain area')
     plt.xlabel('Number of frames')
     plt.ylabel('Average area (pixels)')
-    if legend!= []: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_area_time'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_avg_grain_area_time'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
 
     # Plot scaled average grain area through time and find linear slopes
     ys = []
@@ -1171,6 +1134,7 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
         xs.append(xx)
     
     plt.figure()
+    legend = []
     for i in range(len(hps)):
         plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
         plt.xlim([np.max(xs[i]), np.min(xs[i])])
@@ -1178,10 +1142,9 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     plt.title('Average grain area (scaled)')
     plt.xlabel('Number of grains')
     plt.ylabel('Average area (pixels)')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_area_time_scaled'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_avg_grain_area_time_scaled'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
     
     # Plot average grain sides through time
     log = []
@@ -1191,19 +1154,20 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
         log.append(grain_sides_avg)
     
     plt.figure()
+    legend = []
     for i in range(len(hps)):
         plt.plot(log[i], c=c[i%len(c)])
         legend.append('')
     plt.title('Average number of grain sides')
     plt.xlabel('Number of frames')
     plt.ylabel('Average number of sides')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_sides_time'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_avg_grain_sides_time'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
     
     # Plot scaled average grain sides through time
     plt.figure()
+    legend = []
     for i in range(len(hps)):
         plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
         plt.xlim([np.max(xs[i]), np.min(xs[i])])
@@ -1211,10 +1175,9 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     plt.title('Average number of grain sides (scaled)')
     plt.xlabel('Number of grains')
     plt.ylabel('Average number of sides')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_sides_time_scaled'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_avg_grain_sides_time_scaled'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
     
     # Plot grain size distribution
     plt.figure()
@@ -1233,10 +1196,9 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     plt.title('Normalized radius distribution (%d%% grains remaining)'%(100*frac))
     plt.xlabel('R/<R>')
     plt.ylabel('Frequency')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_normalized_radius_distribution'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_normalized_radius_distribution'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
     
     # Plot number of sides distribution
     plt.figure()
@@ -1255,10 +1217,10 @@ def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ng
     plt.title('Number of sides distribution (%d%% grains remaining)'%(100*frac))
     plt.xlabel('Number of sides')
     plt.ylabel('Frequency')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_number_sides_distribution'%(sub_folder, ic_shape), dpi=300)
+    if legend==True: plt.legend(legend)
+    plt.savefig('./plots/%s_number_sides_distribution'%("").join(hps[i].split("/")[2].split(".")[:2]), dpi=300)
     plt.show()
-    plt.close()
+    print(si)
 
 def unison_shuffled_copies(a, b):
     assert len(a) == len(b)
