@@ -94,8 +94,8 @@ class PRIMME(nn.Module):
             print(f.keys())
             ims_id = f['ims_id'][:]
             miso_array = f['miso_array'][:]
-        self.im_seq_T = torch.from_numpy(ims_id[:n_samples[0], :n_step[1]])
-        self.miso_array_T = miso_array[:n_samples[0]]
+        self.im_seq_T = torch.from_numpy(ims_id[:n_samples, :n_step])
+        self.miso_array_T = miso_array[:n_samples]
         self.seq_samples = list(np.arange(len(self.im_seq_T)))
 
     def sample_data(self, batch_size = 1):
@@ -303,6 +303,7 @@ def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Ste
 
     agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, 
                    num_dims=dims, mode = mode, device = device).to(device)    
+
     agent.load_data(h5_path=trainset, n_step=n_step, n_samples=n_samples)
     append_name = trainset.split('_kt')[0].split("spparks_")[1]
     
@@ -319,6 +320,7 @@ def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Ste
             modelname = './data/' + agent.subfolder + '.h5'
             agent.save("%s" % modelname)
             ## Generate test case and Run PRIMME model    
+            '''
             nsteps = 1800
             for key in test_case_dict.keys():
                 grain_shape, grain_sizes = test_case_dict[key]
@@ -340,6 +342,7 @@ def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Ste
                 fs.make_videos(fp_primme, sub_folder, ic_shape)
                 if grain_shape == "grain":
                     fs.make_time_plots(fp_primme, sub_folder, ic_shape)    
+            '''
 
 
 def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):

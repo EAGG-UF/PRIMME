@@ -39,6 +39,7 @@ ic, ea = fs.generate_circleIC(size=[257,257], r=64) #nsteps=200, pad_mode='circu
 # ic, ea, _ = fs.voronoi2image(size=[2400, 2400], ngrain=24000) #nsteps=1500, pad_mode='circular'
 
 
+trainset = "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5"
 ## Run PRIMME model
 model_location = "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(1000)_kt(0.66)_cut(0).h5"
 ic_shape = "grain(512-512)"
@@ -59,7 +60,11 @@ for key in test_case_dict.keys():
     else:
         ic, ea, miso_array, miso_matrix = fs.generate_train_init(filename_test, grain_shape, grain_sizes, device)
 
-ims_id, fp_primme = PRIMME.run_primme(ic, ea, miso_array, miso_matrix, nsteps=1800, ic_shape=ic_shape,  modelname=model_location, pad_mode='circular', if_plot=True)
+# def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Step", num_eps=25, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
+model_location = PRIMME.train_primme(trainset, n_step=1000, n_samples=200, test_case_dict=test_case_dict, mode="Single_Step", num_eps=100, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False)
+
+# def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
+ims_id, fp_primme = PRIMME.run_primme(ic, ea, miso_array, miso_matrix, nsteps=1800, ic_shape=ic_shape, modelname=model_location, pad_mode='circular', if_plot=False)
 # run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
 fs.compute_grain_stats(fp_primme)
 fs.make_videos(fp_primme) #saves to 'plots'
