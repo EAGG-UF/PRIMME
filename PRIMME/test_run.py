@@ -23,7 +23,9 @@ from pathlib import Path
 # model_location = PRIMME.train_primme(trainset, num_eps=1000, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=True)
 
 device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+
+# MAC Fix
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 ### VALIDATION
 
@@ -61,10 +63,10 @@ for key in test_case_dict.keys():
         ic, ea, miso_array, miso_matrix = fs.generate_train_init(filename_test, grain_shape, grain_sizes, device)
 
 # def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Step", num_eps=25, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
-# model_location = PRIMME.train_primme(trainset, n_step=1000, n_samples=200, test_case_dict=test_case_dict, mode="Single_Step", num_eps=100, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False)
+model_location = PRIMME.train_primme(trainset, n_step=1000, n_samples=200, test_case_dict=test_case_dict, mode="Single_Step", num_eps=100, dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False)
 
 # def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
-ims_id, fp_primme = PRIMME.run_primme(ic, ea, miso_array, miso_matrix, nsteps=1800, ic_shape=ic_shape, modelname=model_location, pad_mode='circular', if_plot=True)
+ims_id, fp_primme = PRIMME.run_primme(ic, ea, miso_array, miso_matrix, nsteps=1800, ic_shape=ic_shape, modelname=model_location, pad_mode='circular', if_plot=False)
 # run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
 fs.compute_grain_stats(fp_primme)
 fs.make_videos(fp_primme) #saves to 'plots'
