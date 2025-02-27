@@ -76,10 +76,3 @@ fs.make_time_plots(fp_primme) #saves to 'plots'
 # fs.compute_grain_stats(fp_spparks) 
 # fs.make_videos(fp_spparks) #saves to 'plots'
 # fs.make_time_plots(fp_spparks) #saves to 'plots'
-
-
-## Compare PRIMME and SPPARKS statistics
-fp_spparks = './data/spparks_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5'
-fp_primme = './data/primme_sz(1024x1024)_ng(4096)_nsteps(1000)_freq(1)_kt(0.66)_cut(0).h5'
-hps = [fp_spparks, fp_primme]
-fs.make_time_plots(hps)
