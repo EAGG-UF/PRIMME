@@ -1,5 +1,6 @@
 # Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gabo0802/PRIMME-Readable/blob/main/PRIMME/run.ipynb)
 
 ## Description:
 
