@@ -1060,7 +1060,7 @@ def compute_grain_stats(hps, gps='sim0', device=device):
                 g['grain_sides_avg'] = grain_sides_avg
                 print('Calculated: grain_sides_avg')
 
-def make_videos(hps, sub_folder, ic_shape, gps='sim0'):
+def make_videos(hps, ic_shape, sub_folder="", gps='sim0'):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already
@@ -1070,15 +1070,24 @@ def make_videos(hps, sub_folder, ic_shape, gps='sim0'):
     # Make sure all needed datasets exist
     #dts=['ims_id', 'ims_miso', 'ims_miso_spparks']
     #check_exist_h5(hps, gps, dts)  
-    for i in tqdm(range(len(hps)), "Making videos"):
-        with h5py.File(hps[i], 'a') as f:
-            g = f[gps[i]]
-            ims = g['ims_id'][:,0]
-            ims = (255/np.max(ims)*ims).astype(np.uint8)
-            imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), ims)
-            imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), ims)
+    if sub_folder:
+        for i in tqdm(range(len(hps)), "Making videos"):
+            with h5py.File(hps[i], 'a') as f:
+                g = f[gps[i]]
+                ims = g['ims_id'][:,0]
+                ims = (255/np.max(ims)*ims).astype(np.uint8)
+                imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), ims)
+                imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), ims)
+    else:
+        for i in tqdm(range(len(hps)), "Making videos"):
+            with h5py.File(hps[i], 'a') as f:
+                g = f[gps[i]]
+                ims = g['ims_id'][:,0]
+                ims = (255/np.max(ims)*ims).astype(np.uint8)
+                imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), ims)
+                imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), ims)
 
-def make_time_plots(hps, sub_folder, ic_shape, legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None):
+def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already, and set default 'gps'
