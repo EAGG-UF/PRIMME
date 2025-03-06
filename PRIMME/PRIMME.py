@@ -298,7 +298,7 @@ class PRIMME(nn.Module):
         # self.model.save(name)
         torch.save(self.state_dict(), name)
 
-def train_primme(trainset, n_step, n_samples, mode = "Single_Step", num_eps=25, 
+def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Step", num_eps=25,
                  dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
 
     agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, 
