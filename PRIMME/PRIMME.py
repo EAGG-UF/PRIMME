@@ -24,9 +24,9 @@ from pathlib import Path
 import os
 from random import shuffle
 import functions as fs
-import dice
+# import dice
 from tqdm import tqdm
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # BUILD PRIMME CLASS
 class PRIMME(nn.Module):
@@ -94,8 +94,8 @@ class PRIMME(nn.Module):
             print(f.keys())
             ims_id = f['ims_id'][:]
             miso_array = f['miso_array'][:]
-        self.im_seq_T = torch.from_numpy(ims_id[:n_samples, :n_step])
-        self.miso_array_T = miso_array[:n_samples]
+        self.im_seq_T = torch.from_numpy(ims_id[:n_samples[0], :n_step[0]])
+        self.miso_array_T = miso_array[:n_samples[0]]
         self.seq_samples = list(np.arange(len(self.im_seq_T)))
 
     def sample_data(self, batch_size = 1):
