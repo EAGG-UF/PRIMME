@@ -14,7 +14,7 @@ from pathlib import Path
 
 def main(args):
     # Set device
-    device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     
     # Define grain sizes based on provided value
     grain_sizes = [[args.grain_size, args.grain_size], args.grain_size]

@@ -26,7 +26,7 @@ from random import shuffle
 import functions as fs
 # import dice
 from tqdm import tqdm
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 # BUILD PRIMME CLASS
 class PRIMME(nn.Module):
@@ -94,8 +94,8 @@ class PRIMME(nn.Module):
             print(f.keys())
             ims_id = f['ims_id'][:]
             miso_array = f['miso_array'][:]
-        self.im_seq_T = torch.from_numpy(ims_id[:n_samples[0], :n_step[0]])
-        self.miso_array_T = miso_array[:n_samples[0]]
+        self.im_seq_T = torch.from_numpy(ims_id[:n_samples, :n_step])
+        self.miso_array_T = miso_array[:n_samples]
         self.seq_samples = list(np.arange(len(self.im_seq_T)))
 
     def sample_data(self, batch_size = 1):
@@ -298,7 +298,7 @@ class PRIMME(nn.Module):
         # self.model.save(name)
         torch.save(self.state_dict(), name)
 
-def train_primme(trainset, n_step, n_samples, test_case_dict, mode = "Single_Step", num_eps=25,
+def train_primme(trainset, n_step, n_samples, mode = "Single_Step", num_eps=25,
                  dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
 
     agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, 

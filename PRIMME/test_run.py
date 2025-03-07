@@ -15,7 +15,8 @@ import functions as fs
 import PRIMME
 from pathlib import Path
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+print(f"Using device: {device}")
 
 ### Create training set by running SPPARKS
 # trainset_location = fs.create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=0.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4)
