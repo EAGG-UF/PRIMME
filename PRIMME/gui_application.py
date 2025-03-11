@@ -173,7 +173,7 @@ def create_app():
                     ui.input(label='Euler Angles Path', value=parameters['ea'], 
                             on_change=lambda e: parameters.update({"ea": e.value})).classes('w-full')
                     
-                    ui.input(label='Misorientation Angles Path', value=parameters['ma'], 
+                    ui.input(label='Miso Angles Path', value=parameters['ma'], 
                             on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
                 
                         # Bind the visibility of the path inputs to the checkbox value
@@ -192,10 +192,9 @@ def create_app():
                         ngrain = 2 ** exponent
                         parameters.update({"ngrain": ngrain})
                         ngrain_label.set_text(f"Number of Grains: 2^{exponent} or {ngrain}")
-
+                    ngrain_label = ui.label(f"Number of Grains: 2^14 or {parameters['ngrain']}").classes('font-bold')
                     ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
-                              on_change=update_ngrain).classes('w-full')
-                    ngrain_label = ui.label(f"Number of Grains: 2^14 or {parameters['ngrain']}").classes('ml-4')
+                              on_change=update_ngrain).classes('w-full -mt-5')
                 
                 ui.input(label='PRIMME File (leave empty to run model)', value=parameters['primme'] or "", 
                          on_change=lambda e: parameters.update({"primme": e.value if e.value else None})).classes('w-full')
