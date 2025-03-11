@@ -24,8 +24,8 @@ from pathlib import Path
 import os
 from random import shuffle
 import functions as fs
-# import dice
 from tqdm import tqdm
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 # BUILD PRIMME CLASS
@@ -319,30 +319,6 @@ def train_primme(trainset, n_step, n_samples, mode = "Single_Step", num_eps=25,
             if if_plot: agent.plot()
             modelname = './data/' + agent.subfolder + '.h5'
             agent.save("%s" % modelname)
-            ## Generate test case and Run PRIMME model    
-            '''
-            nsteps = 1800
-            for key in test_case_dict.keys():
-                grain_shape, grain_sizes = test_case_dict[key]
-                if grain_shape == "hex":
-                    ic_shape = grain_shape
-                else:   
-                    ic_shape = grain_shape + "(" + ("_").join([str(grain_sizes[0][0]), str(grain_sizes[0][1]), str(grain_sizes[1])]) + ")"
-                filename_test = ic_shape + ".pickle"    
-                path_load = Path('./data').joinpath(filename_test)
-                if os.path.isfile(str(path_load)):  
-                    data_dict = fs.load_picke_files(load_dir = Path('./data'), filename_save = filename_test)
-                    ic, ea, miso_array, miso_matrix = data_dict["ic"], data_dict["ea"], data_dict["miso_array"], data_dict["miso_matrix"]  
-                else:
-                    ic, ea, miso_array, miso_matrix = fs.generate_train_init(filename_test, grain_shape, grain_sizes, device)
-                ## Run PRIMME model
-                ims_id, fp_primme = run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname)
-                sub_folder = "pred" + fp_primme.split("/")[2].split(".")[0].split("pred")[1]
-                fs.compute_grain_stats(fp_primme)
-                fs.make_videos(fp_primme, sub_folder, ic_shape)
-                if grain_shape == "grain":
-                    fs.make_time_plots(fp_primme, sub_folder, ic_shape)    
-            '''
 
 
 def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
