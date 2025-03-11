@@ -1077,17 +1077,31 @@ def make_videos(hps, ic_shape, sub_folder="", gps='sim0'):
             with h5py.File(hps[i], 'a') as f:
                 g = f[gps[i]]
                 ims = g['ims_id'][:,0]
-                ims = (255/np.max(ims)*ims).astype(np.uint8)
-                imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), ims)
-                imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), ims)
+                # Create colored frames
+                colored_frames = []
+                for frame in ims:
+                    # Apply a colormap: 'viridis', 'jet', 'rainbow', etc.
+                    colored_frame = plt.cm.viridis(frame/np.max(frame))
+                    # Convert to uint8 RGB format (remove alpha channel)
+                    colored_frame = (colored_frame[:,:,:3] * 255).astype(np.uint8)
+                    colored_frames.append(colored_frame)
+                imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), colored_frames)
+                imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), colored_frames)
     else:
         for i in tqdm(range(len(hps)), "Making videos"):
             with h5py.File(hps[i], 'a') as f:
                 g = f[gps[i]]
                 ims = g['ims_id'][:,0]
-                ims = (255/np.max(ims)*ims).astype(np.uint8)
-                imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), ims)
-                imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), ims)
+                # Create colored frames
+                colored_frames = []
+                for frame in ims:
+                    # Apply a colormap: 'viridis', 'jet', 'rainbow', etc.
+                    colored_frame = plt.cm.viridis(frame/np.max(frame))
+                    # Convert to uint8 RGB format (remove alpha channel)
+                    colored_frame = (colored_frame[:,:,:3] * 255).astype(np.uint8)
+                    colored_frames.append(colored_frame)
+                imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), colored_frames)
+                imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), colored_frames)
 
 def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None, if_plot=True):
     # Run "compute_grain_stats" before this function
