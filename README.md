@@ -1,11 +1,8 @@
 # Physics-Regulated Interpretable Machine Learning Microstructure Evolution (PRIMME)
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gabo0802/PRIMME-Readable/blob/main/PRIMME/run.ipynb)
-
 ## Description:
 
-Physics-Regularized Interpretable Machine Learning Microstructure Evolution (PRIMME)
-This code can be used to train and validate PRIMME neural network models for simulating isotropic microstructural grain growth
+Physics-Regularized Interpretable Machine Learning Microstructure Evolution (PRIMME): This code can be used to train and validate PRIMME neural network models for simulating isotropic microstructural grain growth.
 	
 ## Contributors: 
 
@@ -15,21 +12,25 @@ Weishi Yan (1), Joel Harley (1), Joseph Melville (1), Kristien Everett (1), Lin 
 
 ### Top level folders:
 
-SPPARKS - 	Reference files to run SPPARKS simulations
-
 PRIMME - 	Actual PRIMME code
 
 ### "PRIMME" folder:
-
-cfg - 		Keras reference files
-
-spparks_files -	See "Getting_Started.txt" for help getting SPPARKS functioning on the lambda server
 
 functions - 	All of the functions used to create initial conditions, run SPPARKS and PRIMME, and calculate statistics
 
 PRIMME - 	A class that contains the PRIMME model and some helper functions
 
-run - 		References 'functions' to run and evaluate SPPARKS and PRIMME simulations
+run_script - 	References 'functions' to run and evaluate SPPARKS and PRIMME simulations, with parameters specified through program arguments.
+
+test_run -	Test run file for user to manually run PRIMME with desired parameters, outside of the ones provided by 'run_script'.
+
+run.ipynb -	Copy of test_run made for Jupyter Notebook and Google colab.
+
+gui_appplication -	Provides a Graphic User Interface (GUI) for the user to run and train PRIMME, leverages 'run_script'.
+
+plots -		Output plots from run_script are stored here, PRIMME will automatically make this folder if it does not exist.
+
+data -		Output models from run_script are stored here, PRIMME will automatically make this folder if it does not exist.
 
 #### "functions" file (sections):
 
@@ -39,7 +40,7 @@ General - 			File management functions
 
 Create initial conditions - 	See "voronoi2image" first
 
-Run and read SPPARKS - 		See "run_spparks" first
+Run and read SPPARKS - 		See "run_spparks" first **NOT USED FOR THIS VERSION OF PRIMME*
 
 Find misorientations - 		See "find_misorientation" first
 
@@ -48,19 +49,31 @@ Statistical functions - 	See "compute_grain_stats" first
 Run PRIMME - 			See "run_primme" first 
 
 ### Other notes:
--The use of GPU 0 (or CPU is GPU 0 is not available) is hard coded in two places, at the beginning of both the "PRIMME" and "functions" files
--The output of 'run.py' is the images of a circle grain PRIMME simulation.
 
+- GPU Usage (GPU 0,  MPS (for MAC), or CPU if neither is available) is hard coded in two places, at the beginning of both the "PRIMME" and "functions" files.
+
+- This model is often trained of SPPARKS data, see its [GitHub](https://github.com/spparks/spparks) and [Documentation](https://spparks.github.io/) for more information.
 
 ## Usage
-Use the following command to install pre-requirement packages
+
+There are two ways to run the program:
+
+### Google Colab
+
+See the following Colab link to run PRIMME remotely 
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gabo0802/PRIMME-Readable/blob/main/PRIMME/run.ipynb)
+
+### Local GUI
+
+Use the following command to install pre-requirement packages (ideally in a [virtual environment](https://www.freecodecamp.org/news/how-to-setup-virtual-environments-in-python/))
 ```bash
 pip install -r requirements.txt
 ```
 
-Running the PRIMME
+Run the GUI Application for Training and Running PRIMME
 ```python
-python run.py
+python gui_application.py
 ```
 
 ## Demo
