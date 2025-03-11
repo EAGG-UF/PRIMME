@@ -119,10 +119,20 @@ def create_app():
                 #              on_change=lambda e: parameters.update({"reg": float(e.value)}))
                 
                 with ui.row():
-                    ui.number(label='Number of Epochs', value=parameters['num_eps'], 
-                             on_change=lambda e: parameters.update({"num_eps": int(e.value)}))
-                    ui.number(label='Number of Steps', value=parameters['nsteps'], 
-                             on_change=lambda e: parameters.update({"nsteps": int(e.value)}))
+                    def update_num_eps(e):
+                        parameters.update({"num_eps": int(e.value)})
+                        num_eps_label.set_text(f"Number of Training Epochs: {e.value}")
+                    def update_num_steps(e):
+                        parameters.update({"nsteps": int(e.value)})
+                        num_steps_label.set_text(f"Number of Steps: {e.value}")
+                    num_eps_label = ui.label(f"Number of Training Epochs: {parameters['num_eps']}").classes('font-bold')
+                    ui.slider(min=5, max=2000, step=5, value=parameters['num_eps'], 
+                             on_change=update_num_eps).classes('w-full -mt-5')
+                    
+                    num_steps_label = ui.label(f"Number of Steps: {parameters['nsteps']}").classes('font-bold')
+                    ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
+                             on_change=update_num_steps).classes('w-full -mt-5')
+                    
                     
                 # The two below options are generally not changed so leaving out.
                     # ui.number(label='Number of Samples', value=parameters['n_samples'], 
@@ -148,8 +158,8 @@ def create_app():
                 ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
                          on_change=lambda e: parameters.update({"grain_shape": e.value})).classes('w-full')
                 
-                ui.number(label='Grain Size', value=parameters['grain_size'], 
-                         on_change=lambda e: parameters.update({"grain_size": int(e.value)}))
+                ui.select(options=[257, 512, 1024, 2048, 2400],label='Grain Size', value=parameters['grain_size'], 
+                         on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('w-full')
                 
                 voroni_checkbox = ui.checkbox('Voroni Loaded', value=parameters['voroni_loaded'], 
                    on_change=lambda e: parameters.update({"voroni_loaded": e.value}))
@@ -157,13 +167,13 @@ def create_app():
                 # Create the input fields that should be conditionally visible
                 # Use a container to group them for easier visibility control
                 with ui.column() as path_inputs:
-                    ic_input = ui.input(label='Initial Condition Path', value=parameters['ic'], 
+                    ui.input(label='Initial Condition Path', value=parameters['ic'], 
                             on_change=lambda e: parameters.update({"ic": e.value})).classes('w-full')
                     
-                    ea_input = ui.input(label='Euler Angles Path', value=parameters['ea'], 
+                    ui.input(label='Euler Angles Path', value=parameters['ea'], 
                             on_change=lambda e: parameters.update({"ea": e.value})).classes('w-full')
                     
-                    ma_input = ui.input(label='Misorientation Angles Path', value=parameters['ma'], 
+                    ui.input(label='Misorientation Angles Path', value=parameters['ma'], 
                             on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
                 
                         # Bind the visibility of the path inputs to the checkbox value
@@ -240,28 +250,26 @@ def create_app():
                             # Center the image with a flex container
                             with ui.row().classes('w-full justify-center'):
                                 ui.image(plot_file).classes('max-w-2xl')
+                                
+                video_container = ui.column().classes('w-full gap-4 items-center')
                 
-                # Add a section for video display
-                with ui.expansion('Video Results', icon='movie').classes('w-full mt-4'):
-                    video_container = ui.column().classes('w-full gap-4 items-center')  # Added items-center
+                def refresh_videos():
+                    video_container.clear()
+                    video_files = glob.glob('./plots/*.mp4')
                     
-                    def refresh_videos():
-                        video_container.clear()
-                        video_files = glob.glob('./plots/*.mp4')
-                        
-                        if not video_files:
-                            with video_container:
-                                ui.label('No videos found').classes('italic text-gray-500')
-                            return
-                        
-                        for video_file in sorted(video_files):
-                            with video_container:
-                                ui.label(format_plot_title(video_file)).classes('font-bold text-center')
-                                # Center the video with a flex container
-                                with ui.row().classes('w-full justify-center'):
-                                    ui.video(video_file).classes('max-w-2xl')
+                    if not video_files:
+                        with video_container:
+                            ui.label('No videos found').classes('italic text-gray-500')
+                        return
                     
-                    ui.button('Refresh Videos', on_click=refresh_videos).classes('mt-2')
+                    for video_file in sorted(video_files):
+                        with video_container:
+                            ui.label(format_plot_title(video_file)).classes('font-bold text-center')
+                            # Center the video with a flex container
+                            with ui.row().classes('w-full justify-center'):
+                                ui.video(video_file).classes('max-w-2xl')
+                
+                ui.button('Refresh Videos', on_click=refresh_videos).classes('mt-2')
                 
                 # Initial load of results
                 refresh_results()
