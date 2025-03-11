@@ -301,24 +301,26 @@ class PRIMME(nn.Module):
 def train_primme(trainset, n_step, n_samples, mode = "Single_Step", num_eps=25,
                  dims=2, obs_dim=17, act_dim=17, lr=5e-5, reg=1, pad_mode="circular", if_plot=False):
 
+    print(f"Training PRIMME using device: {device}")
     agent = PRIMME(obs_dim=obs_dim, act_dim=act_dim, pad_mode=pad_mode, learning_rate=lr, 
                    num_dims=dims, mode = mode, device = device).to(device)    
 
     agent.load_data(h5_path=trainset, n_step=n_step, n_samples=n_samples)
     append_name = trainset.split('_kt')[0].split("spparks_")[1]
+    modelname = ''
     
     for epoch in tqdm(range(1, num_eps+1), desc='Epochs', leave=True):  
         #agent.sample_data(h5_path=trainset, batch_size=1)
         agent.train()
         if epoch % 5 == 0: 
-            agent.subfolder = "pred(%s)_%s_ep(%d)_pad(%s)_md(%d)_sz(%d_%d)_lr(%.0e)_reg(%s)" % (agent.mode, append_name, epoch, agent.pad_mode, agent.num_dims,
-                                                                                                agent.obs_dim, agent.act_dim, agent.learning_rate, agent.reg)
+            agent.subfolder = "model_dim(%d)_sz(%d_%d)_lr(%.0e)_reg(%s)_ep(%d)_kt(0.66)_cut(0)" % (agent.num_dims, agent.obs_dim, agent.act_dim, agent.learning_rate, agent.reg, epoch)
             agent.result_path = ("/").join(['./plots', agent.subfolder])
             if not os.path.exists(agent.result_path):
                 os.makedirs(agent.result_path)              
             if if_plot: agent.plot()
             modelname = './data/' + agent.subfolder + '.h5'
             agent.save("%s" % modelname)
+    return modelname
 
 
 def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad_mode='circular',  mode = "Single_Step", if_plot=False):
