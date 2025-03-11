@@ -585,6 +585,7 @@ def process_dump(path_to_dump='./spparks_simulations/spparks.dump'):
 
 def create_SPPARKS_dataset(size=[257,257], ngrains_rng=[256, 256], kt=0.66, cutoff=25.0, nsets=200, max_steps=100, offset_steps=1, future_steps=4, del_sim=False):
     
+    # DEPRECATED FOR THIS VERSION OF PRIMME, THE USER MUST FIND A SPPARKS TRAINSET MODEL TO USE
     # SET SIMULATION PATH
     path_sim = './spparks_simulation_trainset/'
         

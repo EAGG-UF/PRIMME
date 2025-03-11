@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar 11 01:12:31 2026
+
+@author: gabriel.castejon
+"""
+
 from nicegui import ui
 import subprocess
 import sys
