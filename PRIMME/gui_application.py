@@ -83,8 +83,7 @@ def create_app():
     }
     
     # Create UI
-    # Use ui.colors instead of dark_mode if that's causing issues
-    ui.colors(primary='#1976D2')
+    ui.switch('Dark Mode', value=False, on_change=lambda e: ui.dark_mode().enable() if e.value else ui.dark_mode().disable())
     
     with ui.tabs().classes('w-full') as tabs:
         model_tab = ui.tab('Model Parameters')
@@ -224,7 +223,7 @@ def create_app():
                 # Header row with title and refresh button side by side
                 with ui.row().classes('w-full items-center justify-between'):
                     ui.label('Results Viewer').classes('text-xl font-bold')
-                    ui.button('Refresh All Results', on_click=lambda: (refresh_results(), refresh_videos())).classes('bg-green-500')
+                    ui.button('Refresh Results', on_click=lambda: (refresh_results(), refresh_videos())).classes('bg-green-500')
                 
                 # Create a container for plots
                 plot_container = ui.column().classes('w-full gap-4 items-center')  # Added items-center to center content
@@ -267,9 +266,7 @@ def create_app():
                             # Center the video with a flex container
                             with ui.row().classes('w-full justify-center'):
                                 ui.video(video_file).classes('max-w-2xl')
-                
-                ui.button('Refresh Videos', on_click=refresh_videos).classes('mt-2')
-                
+                                
                 # Initial load of results
                 refresh_results()
                 refresh_videos()
