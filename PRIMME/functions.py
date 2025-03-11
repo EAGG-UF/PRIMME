@@ -390,7 +390,8 @@ def calc_MisoEnergy(fp=r"../SPPARKS/examples/agg/2d_sim/"):
 
 def run_spparks(ic, ea, nsteps=500, kt=0.66, cut=25.0, freq=(1,1), rseed=None, miso_array=None, which_sim='agg', bcs=['p','p','p'], save_sim=True, del_sim=False, path_sim=None):
     '''
-    Runs one simulation and returns the file path where the simulation was run
+    **DEPRECATED FOR THIS VERSION OF PRIMME, THE USER MUST FIND A SPPARKS TRAINSET MODEL TO USE**
+    Runs one simulation and returns the file path where the simulation was run 
     
     Input:
         rseed: random seed for the simulation (the same rseed and IC will grow the same)
