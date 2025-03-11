@@ -78,8 +78,8 @@ def main(args):
     # Generate plots and statistics
     print("Computing grain statistics and generating plots")
     fs.compute_grain_stats(fp)
-    fs.make_videos(fp, ic_shape=ic_shape, )
-    fs.make_time_plots(fp, ic_shape=ic_shape)
+    fs.make_videos(fp, ic_shape=ic_shape)
+    fs.make_time_plots(fp, ic_shape=ic_shape, if_plot=args.if_output_plot)
     
     print(f"PRIMME simulation complete. Results saved to: {fp}")
 
@@ -118,11 +118,13 @@ if __name__ == "__main__":
 
     # PRIMME Run Related Arguments
     parser.add_argument("--primme", type=str, default=None, help="PRIMME File was provided.")
-    # if not provided, these are the default values
+
     parser.add_argument("--pad_mode", type=str, default="circular", help="Padding mode.")
+    parser.add_argument("--if_output_plot", action="store_true", help="If output plot.")
 
     # Show plots:
     args = parser.parse_args()
+    print(f"Running PRIMME with arguments: {args}")
     main(args)
 
 

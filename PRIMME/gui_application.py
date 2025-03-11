@@ -78,7 +78,8 @@ def create_app():
         "dimension": 3,
         "ngrain": 2**14,
         "primme": None,
-        "pad_mode": "circular"
+        "pad_mode": "circular",
+        "if_output_plot": False
     }
     
     # Create UI
@@ -133,8 +134,11 @@ def create_app():
                 ui.select(options=['circular', 'reflect'], label='Padding Mode', value=parameters['pad_mode'], 
                          on_change=lambda e: parameters.update({"pad_mode": e.value}))
                 
-                ui.checkbox('Plot During Training', value=parameters['if_plot'], 
+                ui.checkbox('Output Plots During Training', value=parameters['if_plot'], 
                            on_change=lambda e: parameters.update({"if_plot": e.value}))
+                # Can add later, but not intuitive right now.
+                # ui.checkbox('Output Plots After Simulation', value=parameters['if_output_plot'],
+                #             on_change=lambda e: parameters.update({"if_output_plot": e.value}))
         
         with ui.tab_panel(grain_tab):
             with ui.card().classes('w-full'):

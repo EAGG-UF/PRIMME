@@ -1087,7 +1087,7 @@ def make_videos(hps, ic_shape, sub_folder="", gps='sim0'):
                 imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), ims)
                 imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), ims)
 
-def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None):
+def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None, if_plot=True):
     # Run "compute_grain_stats" before this function
     
     #Make 'hps' and 'gps' a list if it isn't already, and set default 'gps'
@@ -1152,8 +1152,9 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Average area (pixels)')
     if legend!= []: plt.legend(legend)
     plt.savefig('./plots/%s/%s_avg_grain_area_time'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
+    if if_plot:
+        plt.show()
+        plt.close()
 
     # Plot scaled average grain area through time and find linear slopes
     ys = []
@@ -1189,8 +1190,9 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Average area (pixels)')
     if legend!=[]: plt.legend(legend)
     plt.savefig('./plots/%s/%s_avg_grain_area_time_scaled'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
+    if if_plot:
+        plt.show()
+        plt.close()
     
     # Plot average grain sides through time
     log = []
@@ -1208,9 +1210,10 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Average number of sides')
     if legend!=[]: plt.legend(legend)
     plt.savefig('./plots/%s/%s_avg_grain_sides_time'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
-    
+    if if_plot:
+        plt.show()
+        plt.close()
+        
     # Plot scaled average grain sides through time
     plt.figure()
     for i in range(len(hps)):
@@ -1222,9 +1225,10 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Average number of sides')
     if legend!=[]: plt.legend(legend)
     plt.savefig('./plots/%s/%s_avg_grain_sides_time_scaled'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
-    
+    if if_plot:
+        plt.show()
+        plt.close()
+        
     # Plot grain size distribution
     plt.figure()
     frac = 0.25
@@ -1244,8 +1248,9 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Frequency')
     if legend!=[]: plt.legend(legend)
     plt.savefig('./plots/%s/%s_normalized_radius_distribution'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
+    if if_plot:
+        plt.show()
+        plt.close()
     
     # Plot number of sides distribution
     plt.figure()
@@ -1266,8 +1271,9 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
     plt.ylabel('Frequency')
     if legend!=[]: plt.legend(legend)
     plt.savefig('./plots/%s/%s_number_sides_distribution'%(sub_folder, ic_shape), dpi=300)
-    plt.show()
-    plt.close()
+    if if_plot:
+        plt.show()
+        plt.close()
 
 def unison_shuffled_copies(a, b):
     assert len(a) == len(b)
