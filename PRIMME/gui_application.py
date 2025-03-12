@@ -284,8 +284,8 @@ def create_app():
                     stop_event.set()
                 
                 with ui.row().classes('w-full gap-4 items-center justify-between'):
-                    run_button = ui.button('Run Simulation', on_click=on_run_click).classes('bg-blue-500')
-                    stop_button = ui.button('Stop Simulation', on_click=on_run_stop).classes('bg-red-500')
+                    run_button = ui.button('Run Simulation', on_click=on_run_click).classes('!bg-blue-500')
+                    stop_button = ui.button('Stop Simulation', on_click=on_run_stop).classes('!bg-red-500')
 
                 def update_buttons(button=0):
                     run_button.set_enabled(not button)
