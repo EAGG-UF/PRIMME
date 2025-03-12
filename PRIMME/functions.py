@@ -1006,6 +1006,25 @@ def iterate_function(array, func, args=[], device=device):
         log.append(tmp)
     return np.stack(log)
 
+def apply_color_map(ims, cmap='viridis'):
+    '''
+    Applies a colormap to a list of images.
+    ims: list of images
+    cmap: colormap to apply - 'viridis', 'jet', 'rainbow', 'grayscale', etc.
+    '''
+    if cmap=='grayscale':
+        ims = (255/np.max(ims)*ims).astype(np.uint8)
+        return ims
+    colored_frames = []
+    for frame in ims:
+        # Apply a colormap: 'viridis', 'jet', 'rainbow', etc.
+        # see https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html for options.
+        colored_frame = plt.cm.get_cmap(cmap)(frame/np.max(frame))
+        # Convert to uint8 RGB format (remove alpha channel)
+        colored_frame = (colored_frame[:,:,:3] * 255).astype(np.uint8)
+        colored_frames.append(colored_frame)
+    return colored_frames
+
 def compute_grain_stats(hps, gps='sim0', device=device):
     
     #Make 'hps' and 'gps' a list if it isn't already
@@ -1078,30 +1097,17 @@ def make_videos(hps, ic_shape, sub_folder="", gps='sim0'):
                 g = f[gps[i]]
                 ims = g['ims_id'][:,0]
                 # Create colored frames
-                colored_frames = []
-                for frame in ims:
-                    # Apply a colormap: 'viridis', 'jet', 'rainbow', etc.
-                    colored_frame = plt.cm.viridis(frame/np.max(frame))
-                    # Convert to uint8 RGB format (remove alpha channel)
-                    colored_frame = (colored_frame[:,:,:3] * 255).astype(np.uint8)
-                    colored_frames.append(colored_frame)
-                imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), colored_frames)
-                imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), colored_frames)
+                ims = apply_color_map(ims, cmap='viridis')
+                imageio.mimsave('./plots/%s/%s_ims_id%d.mp4'%(sub_folder, ic_shape, i), ims)
+                imageio.mimsave('./plots/%s/%s_ims_id%d.gif'%(sub_folder, ic_shape, i), ims)
     else:
         for i in tqdm(range(len(hps)), "Making videos"):
             with h5py.File(hps[i], 'a') as f:
                 g = f[gps[i]]
                 ims = g['ims_id'][:,0]
-                # Create colored frames
-                colored_frames = []
-                for frame in ims:
-                    # Apply a colormap: 'viridis', 'jet', 'rainbow', etc.
-                    colored_frame = plt.cm.viridis(frame/np.max(frame))
-                    # Convert to uint8 RGB format (remove alpha channel)
-                    colored_frame = (colored_frame[:,:,:3] * 255).astype(np.uint8)
-                    colored_frames.append(colored_frame)
-                imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), colored_frames)
-                imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), colored_frames)
+                ims = apply_color_map(ims, cmap='viridis')
+                imageio.mimsave('./plots/%s_ims_id%d.mp4'%(ic_shape, i), ims)
+                imageio.mimsave('./plots/%s_ims_id%d.gif'%(ic_shape, i), ims)
 
 def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale_ngrains_ratio=0.05, cr=None, if_plot=True):
     # Run "compute_grain_stats" before this function
