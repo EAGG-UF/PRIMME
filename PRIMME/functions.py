@@ -22,6 +22,9 @@ import pickle
 from pathlib import Path
 ### Script
 
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))   
+os.chdir(__location__) # ensure that the working directory is where this scipt is located.
+
 fp = './data/'
 if not os.path.exists(fp): os.makedirs(fp)
 
