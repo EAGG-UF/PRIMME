@@ -113,10 +113,10 @@ def create_app():
                 with ui.row():
                     ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
                              on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-full')
-                    ui.number(label='Observation Dimension', value=parameters['obs_dim'], 
-                             on_change=lambda e: parameters.update({"obs_dim": int(e.value)}))
-                    ui.number(label='Action Dimension', value=parameters['act_dim'], 
-                             on_change=lambda e: parameters.update({"act_dim": int(e.value)}))
+                    ui.select(options=[7,9,11,13,15,17,19,21], label='Observation Dimension', value=parameters['obs_dim'], 
+                             on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-full')
+                    ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
+                             on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-full')
                 
                 # Leaving out customization for these:
                 # with ui.row():
