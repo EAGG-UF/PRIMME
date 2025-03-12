@@ -52,7 +52,7 @@ python gui_application.py
 </p>
 <be>
 
-### Notes:
+## Notes:
 
 - GPU Usage (GPU 0,  MPS (for MAC), or CPU if neither is available) is hard coded in two places, at the beginning of both the "PRIMME" and "functions" files.
 
