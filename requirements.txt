@@ -95,7 +95,6 @@ typing_extensions==4.12.2
 unfoldNd==0.2.3
 urllib3==2.3.0
 uvicorn==0.34.0
-uvloop==0.21.0
 vbuild==0.8.2
 watchfiles==1.0.4
 wcwidth==0.2.13
