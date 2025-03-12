@@ -16,6 +16,15 @@ import time
 import matplotlib.pyplot as plt
 import glob
 
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))   
+os.chdir(__location__) # ensure that the working directory is where this scipt is located.
+
+fp = './data/'
+if not os.path.exists(fp): os.makedirs(fp)
+
+fp = './plots/'
+if not os.path.exists(fp): os.makedirs(fp)
+
 # Function to run the script with the selected parameters
 def run_primme_simulation(parameters, console_output):
     # Build command with parameters
@@ -64,7 +73,7 @@ def create_app():
     # Initialize parameters with defaults
     parameters = {
         "trainset": "./data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5",
-        "modelname": "./data/model_dim(2)_sz(17_17)_lr(5e-05)_reg(1)_ep(1000)_kt(0.66)_cut(0).h5",
+        "modelname": None,
         "dims": 2,
         "if_plot": False,
         "num_eps": 1000,
@@ -90,6 +99,13 @@ def create_app():
         "if_output_plot": False
     }
     
+    data_files = []
+    for ext in ['*.h5']:
+        data_files.extend(glob.glob(f"./data/{ext}"))
+    spparks_trainsets = [f for f in data_files if 'spparks' in f]
+    models_trained = [f for f in data_files if 'model' in f]
+    primme_simulations = [f for f in data_files if 'primme' in f]
+    
     # Create UI
     ui.switch('Dark Mode', value=False, on_change=lambda e: ui.dark_mode().enable() if e.value else ui.dark_mode().disable())
     
@@ -104,19 +120,20 @@ def create_app():
             with ui.card().classes('w-full'):
                 ui.label('PRIMME Model Parameters').classes('text-xl font-bold')
                 
-                ui.input(label='Training Set', value=parameters['trainset'], 
+                ui.select(options=spparks_trainsets, label='Training Set', value=parameters['trainset'], 
                          on_change=lambda e: parameters.update({"trainset": e.value})).classes('w-full')
                 
-                ui.input(label='Model Name (leave empty to train new model)', value=parameters['modelname'] or "", 
-                         on_change=lambda e: parameters.update({"modelname": e.value if e.value else None})).classes('w-full')
+                ui.select(options=['Train New Model'] + models_trained, label='Model Name', value=parameters['modelname'] or 'Train New Model', 
+                         on_change=lambda e: parameters.update({"modelname": e.value if e.value != 'Train New Model' else None})).classes('w-full')
                 
-                with ui.row():
+                with ui.row().classes('gap-4 items-center justify-between'):
                     ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
-                             on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-full')
+                            on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
                     ui.select(options=[7,9,11,13,15,17,19,21], label='Observation Dimension', value=parameters['obs_dim'], 
-                             on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-full')
+                            on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-auto min-w-[150px]')
                     ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
-                             on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-full')
+                            on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-auto min-w-[150px]')
+
                 
                 # Leaving out customization for these:
                 # with ui.row():
@@ -203,8 +220,9 @@ def create_app():
                     ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
                               on_change=update_ngrain).classes('w-full -mt-5')
                 
-                ui.input(label='PRIMME File (leave empty to run model)', value=parameters['primme'] or "", 
-                         on_change=lambda e: parameters.update({"primme": e.value if e.value else None})).classes('w-full')
+                ui.select(options=['Run New Model'] + primme_simulations, label='Model Name', value=parameters['primme'] or 'Run New Model', 
+                         on_change=lambda e: parameters.update({"primme": e.value if e.value != 'Run New Model' else None})).classes('w-full')
+            
         
         with ui.tab_panel(run_tab):
             with ui.card().classes('w-full'):
