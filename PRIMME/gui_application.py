@@ -26,7 +26,7 @@ fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
 # Function to run the script with the selected parameters
-def run_primme_simulation(parameters, console_output):
+def run_primme_simulation(parameters, console_output, stop_event):
     # Build command with parameters
     cmd = [sys.executable, "run_script.py"]
     for key, value in parameters.items():
@@ -44,17 +44,51 @@ def run_primme_simulation(parameters, console_output):
         text=True,
         bufsize=1
     )
+
+    # Create a separate thread to monitor the stop_event
+    def monitor_stop_event():
+        while process.poll() is None:  # While process is running
+            if stop_event.is_set():
+                # Try a more graceful shutdown approach
+                try:
+                    import signal
+                    # Send SIGINT instead of SIGTERM
+                    process.send_signal(signal.SIGINT)
+                    # Give it some time to clean up
+                    time.sleep(0.5)
+                    # Only force terminate if it's still running
+                    if process.poll() is None:
+                        process.terminate()
+                except Exception as e:
+                    console_output.push(f"Error during termination: {str(e)}")
+                console_output.push("Process terminated by user.")
+                break
+            time.sleep(0.1)  # Check every 100ms
     
+    monitor_thread = threading.Thread(target=monitor_stop_event)
+    monitor_thread.daemon = True
+    monitor_thread.start()
+
     # Read and display output in real-time
-    for line in iter(process.stdout.readline, ''):
-        console_output.push(line)
+    try:
+        for line in iter(process.stdout.readline, ''):
+            if stop_event.is_set():
+                break
+            console_output.push(line)
+    except Exception as e:
+        console_output.push(f"Error reading output: {str(e)}")
+    finally:
+        # Ensure resources are properly closed
+        try:
+            process.stdout.close()
+        except:
+            pass
     
-    process.stdout.close()
     return_code = process.wait()
     
-    if return_code == 0:
+    if return_code == 0 and not stop_event.is_set():
         console_output.push("Process completed successfully!")
-    else:
+    elif return_code != 0 and not stop_event.is_set():
         console_output.push(f"Process failed with return code {return_code}")
 
 # Display each plot
@@ -230,19 +264,37 @@ def create_app():
                 
                 console_output = ui.log().classes('w-full h-96 bg-gray-900 text-green-400 font-mono p-4 overflow-auto')
                 
+                stop_event = threading.Event()
+
                 def on_run_click():
                     console_output.clear()
                     console_output.push("Starting PRIMME simulation...")
+                    stop_event.clear()
                     
                     # Run in a separate thread to keep UI responsive
                     thread = threading.Thread(
                         target=run_primme_simulation,
-                        args=(parameters, console_output)
+                        args=(parameters, console_output, stop_event)
                     )
                     thread.daemon = True
                     thread.start()
+
+                def on_run_stop():
+                    console_output.push("Stopping PRIMME simulation...")
+                    stop_event.set()
                 
-                ui.button('Run Simulation', on_click=on_run_click).classes('bg-blue-500')
+                with ui.row().classes('w-full gap-4 items-center justify-between'):
+                    run_button = ui.button('Run Simulation', on_click=on_run_click).classes('bg-blue-500')
+                    stop_button = ui.button('Stop Simulation', on_click=on_run_stop).classes('bg-red-500')
+
+                def update_buttons(button=0):
+                    run_button.set_enabled(not button)
+                    stop_button.set_enabled(button)
+
+                run_button.on('click', lambda: (on_run_click(), update_buttons(1)))
+                stop_button.on('click', lambda: (on_run_stop(), update_buttons(0)))
+
+                update_buttons()
         
         with ui.tab_panel(results_tab):
             with ui.card().classes('w-full'):
