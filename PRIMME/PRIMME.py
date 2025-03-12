@@ -334,7 +334,10 @@ def run_primme(ic, ea, miso_array, miso_matrix, nsteps, ic_shape, modelname, pad
     dtype = 'uint' + str(tmp[np.sum(ngrain>2**tmp)])
     #if np.all(miso_array==None): miso_array = fs.find_misorientation(ea, mem_max=1) 
     #miso_matrix = fs.miso_conversion(torch.from_numpy(miso_array[None,]))[0]
-    fp_save = './data/primme_shape(%s)_%s'%(ic_shape, modelname.split('/')[2])
+    size = ic.shape
+    append_name = modelname.split('_kt')[1]
+    sz_str = ''.join(['%dx'%i for i in size])[:-1]
+    fp_save = './data/primme_sz(%s)_ng(%d)_nsteps(%d)_freq(1)_kt%s'%(sz_str,ngrain,nsteps,append_name)
     
     # Run simulation
     agent.eval()
