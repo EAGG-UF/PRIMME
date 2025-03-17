@@ -126,8 +126,8 @@ def create_app():
         "ma": "./data/ma.npy",
         "ic_shape": "grain(512_512_512)",
         "size": 93,
-        "dimension": 3,
-        "ngrain": 2**14,
+        "dimension": 2,
+        "ngrain": 2**10,
         "primme": None,
         "pad_mode": "circular",
         "if_output_plot": False
@@ -144,29 +144,31 @@ def create_app():
     ui.switch('Dark Mode', value=False, on_change=lambda e: ui.dark_mode().enable() if e.value else ui.dark_mode().disable())
     
     with ui.tabs().classes('w-full') as tabs:
-        model_tab = ui.tab('Model Parameters')
-        grain_tab = ui.tab('Grain Parameters')
+        model_tab = ui.tab('Training Parameters')
+        grain_tab = ui.tab('Testing Parameters')
         run_tab = ui.tab('Run Simulation')
         results_tab = ui.tab('Results')
     
     with ui.tab_panels(tabs, value=model_tab).classes('w-full'):
         with ui.tab_panel(model_tab):
             with ui.card().classes('w-full'):
-                ui.label('PRIMME Model Parameters').classes('text-xl font-bold')
+                ui.label('Training Parameters').classes('text-xl font-bold')
                 
                 ui.select(options=spparks_trainsets, label='Training Set', value=parameters['trainset'], 
                          on_change=lambda e: parameters.update({"trainset": e.value})).classes('w-full')
                 
-                ui.select(options=['Train New Model'] + models_trained, label='Model Name', value=parameters['modelname'] or 'Train New Model', 
+                model_name = ui.select(options=['Train New Model'] + models_trained, label='Model Name', value=parameters['modelname'] or 'Train New Model', 
                          on_change=lambda e: parameters.update({"modelname": e.value if e.value != 'Train New Model' else None})).classes('w-full')
                 
-                with ui.row().classes('gap-4 items-center justify-between'):
-                    ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
-                            on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
-                    ui.select(options=[7,9,11,13,15,17,19,21], label='Observation Dimension', value=parameters['obs_dim'], 
-                            on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-auto min-w-[150px]')
-                    ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
-                            on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-auto min-w-[150px]')
+
+                with ui.column().classes('w-full gap-4') as model_params:
+                    with ui.row().classes('gap-4 items-center justify-between'):
+                        ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
+                                on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
+                        ui.select(options=[7,9,11,13,15,17,19,21], label='Observation Dimension', value=parameters['obs_dim'], 
+                                on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-auto min-w-[150px]')
+                        ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
+                                on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-auto min-w-[150px]')
 
                 
                 # Leaving out customization for these:
@@ -176,22 +178,22 @@ def create_app():
                 #     ui.number(label='Regularization', value=parameters['reg'], 
                 #              on_change=lambda e: parameters.update({"reg": float(e.value)}))
                 
-                with ui.row():
-                    def update_num_eps(e):
-                        parameters.update({"num_eps": int(e.value)})
-                        num_eps_label.set_text(f"Number of Training Epochs: {e.value}")
-                    def update_num_steps(e):
-                        parameters.update({"nsteps": int(e.value)})
-                        num_steps_label.set_text(f"Number of Steps: {e.value}")
-                    num_eps_label = ui.label(f"Number of Training Epochs: {parameters['num_eps']}").classes('font-bold')
-                    ui.slider(min=5, max=2000, step=5, value=parameters['num_eps'], 
-                             on_change=update_num_eps).classes('w-full -mt-5')
+                    with ui.row():
+                        def update_num_eps(e):
+                            parameters.update({"num_eps": int(e.value)})
+                            num_eps_label.set_text(f"Number of Training Epochs: {e.value}")
+                        
+                        num_eps_label = ui.label(f"Number of Training Epochs: {parameters['num_eps']}").classes('font-bold')
+                        ui.slider(min=5, max=2000, step=5, value=parameters['num_eps'], 
+                                on_change=update_num_eps).classes('w-full -mt-5')
+                        
+                    ui.select(options=['circular', 'reflect'], label='Padding Mode', value=parameters['pad_mode'], 
+                         on_change=lambda e: parameters.update({"pad_mode": e.value}))
+                
+                    ui.checkbox('Output Plots During Training', value=parameters['if_plot'], 
+                            on_change=lambda e: parameters.update({"if_plot": e.value}))
                     
-                    num_steps_label = ui.label(f"Number of Steps: {parameters['nsteps']}").classes('font-bold')
-                    ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
-                             on_change=update_num_steps).classes('w-full -mt-5')
-                    
-                    
+                model_params.bind_visibility_from(model_name, 'value', lambda v: v == 'Train New Model')
                 # The two below options are generally not changed so leaving out.
                     # ui.number(label='Number of Samples', value=parameters['n_samples'], 
                     #          on_change=lambda e: parameters.update({"n_samples": int(e.value)}))
@@ -199,32 +201,28 @@ def create_app():
                 # ui.select(options=['Single_Step'], label='Mode', value=parameters['mode'], 
                 #          on_change=lambda e: parameters.update({"mode": e.value}))
                 
-                ui.select(options=['circular', 'reflect'], label='Padding Mode', value=parameters['pad_mode'], 
-                         on_change=lambda e: parameters.update({"pad_mode": e.value}))
                 
-                ui.checkbox('Output Plots During Training', value=parameters['if_plot'], 
-                           on_change=lambda e: parameters.update({"if_plot": e.value}))
                 # Can add later, but not intuitive right now.
                 # ui.checkbox('Output Plots After Simulation', value=parameters['if_output_plot'],
                 #             on_change=lambda e: parameters.update({"if_output_plot": e.value}))
         
         with ui.tab_panel(grain_tab):
             with ui.card().classes('w-full'):
-                ui.label('Grain Parameters').classes('text-xl font-bold')
-                
-                # Corrected select call
-                ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
-                         on_change=lambda e: parameters.update({"grain_shape": e.value})).classes('w-full')
-                
-                ui.select(options=[257, 512, 1024, 2048, 2400],label='Grain Size', value=parameters['grain_size'], 
-                         on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('w-full')
+                ui.label('Testing Parameters').classes('text-xl font-bold')
                 
                 voroni_checkbox = ui.checkbox('Voroni Loaded', value=parameters['voroni_loaded'], 
                    on_change=lambda e: parameters.update({"voroni_loaded": e.value}))
+                
+                with ui.column().classes('w-full') as non_loaded_inputs:
+                    grain_size_select = ui.select(options=[257, 512, 1024, 2048, 2400], label='Grain Size', value=parameters['grain_size'], 
+                            on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('!w-full')
+     
+                    ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
+                            on_change=lambda e: (parameters.update({"grain_shape": e.value}), update_grain(e))).classes('!w-full')
         
                 # Create the input fields that should be conditionally visible
                 # Use a container to group them for easier visibility control
-                with ui.column() as path_inputs:
+                with ui.column() as loaded_inputs:
                     ui.input(label='Initial Condition Path', value=parameters['ic'], 
                             on_change=lambda e: parameters.update({"ic": e.value})).classes('w-full')
                     
@@ -235,28 +233,47 @@ def create_app():
                             on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
                 
                         # Bind the visibility of the path inputs to the checkbox value
-                path_inputs.bind_visibility_from(voroni_checkbox, 'value')
+                loaded_inputs.bind_visibility_from(voroni_checkbox, 'value')
+                non_loaded_inputs.bind_visibility_from(voroni_checkbox, 'value', backward=lambda x: not x)
 
                 # IC Shape does not seem intuitive so leaving out.
                 # ui.input(label='IC Shape', value=parameters['ic_shape'], 
                 #          on_change=lambda e: parameters.update({"ic_shape": e.value})).classes('w-full')
                 
                 with ui.row():
-                    ui.select(options=[2, 3], label='Dimension', value=parameters['dimension'], 
-                             on_change=lambda e: parameters.update({"dimension": int(e.value)})).classes('w-full')
-
                     def update_ngrain(e):
                         exponent = int(e.value)
                         ngrain = 2 ** exponent
                         parameters.update({"ngrain": ngrain})
                         ngrain_label.set_text(f"Number of Grains: 2^{exponent} or {ngrain}")
-                    ngrain_label = ui.label(f"Number of Grains: 2^14 or {parameters['ngrain']}").classes('font-bold')
-                    ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
-                              on_change=update_ngrain).classes('w-full -mt-5')
-                
-                ui.select(options=['Run New Model'] + primme_simulations, label='Model Name', value=parameters['primme'] or 'Run New Model', 
-                         on_change=lambda e: parameters.update({"primme": e.value if e.value != 'Run New Model' else None})).classes('w-full')
-            
+                    
+                    ngrain_label = ui.label(f"Number of Grains: 2^10 or {parameters['ngrain']}").classes('font-bold')
+                    ngrain_slider = ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
+                                        on_change=update_ngrain).classes('w-full -mt-5')
+                    
+                    def update_num_steps(e):
+                        parameters.update({"nsteps": int(e.value)})
+                        num_steps_label.set_text(f"Number of Steps: {e.value}")
+                    
+                    num_steps_label = ui.label(f"Number of Steps: {parameters['nsteps']}").classes('font-bold')
+                    ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
+                            on_change=update_num_steps).classes('w-full -mt-5')
+
+                    # Update the grain shape change handler to also update the ngrain slider
+                    def update_grain(e):
+                        if e.value == 'grain':
+                            # Enable the slider and reset to default value
+                            ngrain_slider.set_enabled(True)
+                            ngrain_slider.value = 10
+                            parameters.update({"ngrain": 2**10})
+                            ngrain_label.set_text("Number of Grains: 2^10 or 1024")
+                            ngrain_slider.update()
+                        else:
+                            # Disable the slider and set ngrain to 1
+                            ngrain_slider.set_enabled(False)
+                            parameters.update({"ngrain": 1})
+                            ngrain_label.set_text("Number of Grains: 1")
+                            ngrain_slider.update()  # Update the slider to reflect the change        
         
         with ui.tab_panel(run_tab):
             with ui.card().classes('w-full'):
