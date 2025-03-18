@@ -15,6 +15,10 @@ import threading
 import time
 import matplotlib.pyplot as plt
 import glob
+import warnings
+
+# At the start of your script
+warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))   
 os.chdir(__location__) # ensure that the working directory is where this scipt is located.
@@ -209,71 +213,85 @@ def create_app():
         with ui.tab_panel(grain_tab):
             with ui.card().classes('w-full'):
                 ui.label('Testing Parameters').classes('text-xl font-bold')
-                
-                voroni_checkbox = ui.checkbox('Voroni Loaded', value=parameters['voroni_loaded'], 
-                   on_change=lambda e: parameters.update({"voroni_loaded": e.value}))
-                
-                with ui.column().classes('w-full') as non_loaded_inputs:
-                    grain_size_select = ui.select(options=[257, 512, 1024, 2048, 2400], label='Grain Size', value=parameters['grain_size'], 
-                            on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('!w-full')
-     
-                    ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
-                            on_change=lambda e: (parameters.update({"grain_shape": e.value}), update_grain(e))).classes('!w-full')
-        
-                # Create the input fields that should be conditionally visible
-                # Use a container to group them for easier visibility control
-                with ui.column() as loaded_inputs:
-                    ui.input(label='Initial Condition Path', value=parameters['ic'], 
-                            on_change=lambda e: parameters.update({"ic": e.value})).classes('w-full')
-                    
-                    ui.input(label='Euler Angles Path', value=parameters['ea'], 
-                            on_change=lambda e: parameters.update({"ea": e.value})).classes('w-full')
-                    
-                    ui.input(label='Miso Angles Path', value=parameters['ma'], 
-                            on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
-                
-                        # Bind the visibility of the path inputs to the checkbox value
-                loaded_inputs.bind_visibility_from(voroni_checkbox, 'value')
-                non_loaded_inputs.bind_visibility_from(voroni_checkbox, 'value', backward=lambda x: not x)
 
+                primme_selected = ui.select(options=["Run New Model"] + primme_simulations, label='PRIMME Simulation', value=parameters['primme'] or 'Run New Model',
+                            on_change=lambda e: parameters.update({"primme": e.value if e.value != 'Run New Model' else None})).classes('w-full')
+                
+                with ui.row().classes('w-full') as grain_params:
+                    voroni_checkbox = ui.checkbox('Voroni Loaded', value=parameters['voroni_loaded'], 
+                    on_change=lambda e: parameters.update({"voroni_loaded": e.value}))
+                    
+                    with ui.column().classes('w-full') as non_loaded_inputs:
+                        grain_size_select = ui.select(options=[257, 512, 1024, 2048, 2400], label='Grain Size', value=parameters['grain_size'], 
+                                on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('!w-full')
+        
+                        ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
+                                on_change=lambda e: (parameters.update({"grain_shape": e.value}), update_grain(e))).classes('!w-full')
+            
+                    # Create the input fields that should be conditionally visible
+                    # Use a container to group them for easier visibility control
+                    with ui.column() as loaded_inputs:
+                        ui.input(label='Initial Condition Path', value=parameters['ic'], 
+                                on_change=lambda e: parameters.update({"ic": e.value})).classes('w-full')
+                        
+                        ui.input(label='Euler Angles Path', value=parameters['ea'], 
+                                on_change=lambda e: parameters.update({"ea": e.value})).classes('w-full')
+                        
+                        ui.input(label='Miso Angles Path', value=parameters['ma'], 
+                                on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
+                    
+                            # Bind the visibility of the path inputs to the checkbox value
+                    loaded_inputs.bind_visibility_from(voroni_checkbox, 'value')
+                    non_loaded_inputs.bind_visibility_from(voroni_checkbox, 'value', backward=lambda x: not x)
+
+                    with ui.row():
+                        def update_ngrain(e):
+                            exponent = int(e.value)
+                            ngrain = 2 ** exponent
+                            parameters.update({"ngrain": ngrain})
+                            ngrain_label.set_text(f"Number of Grains: 2^{exponent} or {ngrain}")
+                        
+                        ngrain_label = ui.label(f"Number of Grains: 2^10 or {parameters['ngrain']}").classes('font-bold')
+                        ngrain_slider = ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
+                                            on_change=update_ngrain).classes('w-full -mt-5')
+                        
+                        def update_num_steps(e):
+                            parameters.update({"nsteps": int(e.value)})
+                            num_steps_label.set_text(f"Number of Steps: {e.value}")
+                        
+                        num_steps_label = ui.label(f"Number of Steps: {parameters['nsteps']}").classes('font-bold')
+                        ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
+                                on_change=update_num_steps).classes('w-full -mt-5')
+
+                        # Update the grain shape change handler to also update the ngrain slider
+                        def update_grain(e):
+                            if e.value == 'grain':
+                                # Enable the slider and reset to default value
+                                ngrain_slider.set_enabled(True)
+                                ngrain_slider.value = 10
+                                parameters.update({"ngrain": 2**10})
+                                ngrain_label.set_text("Number of Grains: 2^10 or 1024")
+                                ngrain_slider.update()
+
+                                grain_size_select.enable()
+                                grain_size_select.set_value(512)
+                                grain_size_select.update()
+                            else:
+                                if e.value == 'hex':
+                                    grain_size_select.set_value(443)
+                                    grain_size_select.disable()
+                                    grain_size_select.update()
+                                # Disable the slider and set ngrain to 1
+                                ngrain_slider.set_enabled(False)
+                                parameters.update({"ngrain": 1})
+                                ngrain_label.set_text("Number of Grains: 1")
+                                ngrain_slider.update()  # Update the slider to reflect the change   
+                grain_params.bind_visibility_from(primme_selected, 'value', lambda v: v == 'Run New Model')
                 # IC Shape does not seem intuitive so leaving out.
                 # ui.input(label='IC Shape', value=parameters['ic_shape'], 
                 #          on_change=lambda e: parameters.update({"ic_shape": e.value})).classes('w-full')
                 
-                with ui.row():
-                    def update_ngrain(e):
-                        exponent = int(e.value)
-                        ngrain = 2 ** exponent
-                        parameters.update({"ngrain": ngrain})
-                        ngrain_label.set_text(f"Number of Grains: 2^{exponent} or {ngrain}")
-                    
-                    ngrain_label = ui.label(f"Number of Grains: 2^10 or {parameters['ngrain']}").classes('font-bold')
-                    ngrain_slider = ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
-                                        on_change=update_ngrain).classes('w-full -mt-5')
-                    
-                    def update_num_steps(e):
-                        parameters.update({"nsteps": int(e.value)})
-                        num_steps_label.set_text(f"Number of Steps: {e.value}")
-                    
-                    num_steps_label = ui.label(f"Number of Steps: {parameters['nsteps']}").classes('font-bold')
-                    ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
-                            on_change=update_num_steps).classes('w-full -mt-5')
-
-                    # Update the grain shape change handler to also update the ngrain slider
-                    def update_grain(e):
-                        if e.value == 'grain':
-                            # Enable the slider and reset to default value
-                            ngrain_slider.set_enabled(True)
-                            ngrain_slider.value = 10
-                            parameters.update({"ngrain": 2**10})
-                            ngrain_label.set_text("Number of Grains: 2^10 or 1024")
-                            ngrain_slider.update()
-                        else:
-                            # Disable the slider and set ngrain to 1
-                            ngrain_slider.set_enabled(False)
-                            parameters.update({"ngrain": 1})
-                            ngrain_label.set_text("Number of Grains: 1")
-                            ngrain_slider.update()  # Update the slider to reflect the change        
+                     
         
         with ui.tab_panel(run_tab):
             with ui.card().classes('w-full'):
@@ -301,8 +319,8 @@ def create_app():
                     stop_event.set()
                 
                 with ui.row().classes('w-full gap-4 items-center justify-between'):
-                    run_button = ui.button('Run Simulation', on_click=on_run_click).classes('!bg-blue-500')
-                    stop_button = ui.button('Stop Simulation', on_click=on_run_stop).classes('!bg-red-500')
+                    run_button = ui.button('Run Simulation').classes('!bg-blue-500')
+                    stop_button = ui.button('Stop Simulation').classes('!bg-red-500')
 
                 def update_buttons(button=0):
                     run_button.set_enabled(not button)
