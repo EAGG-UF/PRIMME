@@ -15,10 +15,6 @@ import threading
 import time
 import matplotlib.pyplot as plt
 import glob
-import warnings
-
-# At the start of your script
-warnings.filterwarnings("ignore", message="resource_tracker: There appear to be .* leaked semaphore objects")
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))   
 os.chdir(__location__) # ensure that the working directory is where this scipt is located.
@@ -167,8 +163,8 @@ def create_app():
 
                 with ui.column().classes('w-full gap-4') as model_params:
                     with ui.row().classes('gap-4 items-center justify-between'):
-                        ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
-                                on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
+                        # ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
+                        #         on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
                         ui.select(options=[7,9,11,13,15,17,19,21], label='Observation Dimension', value=parameters['obs_dim'], 
                                 on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-auto min-w-[150px]')
                         ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
@@ -281,10 +277,10 @@ def create_app():
                                     grain_size_select.set_value(443)
                                     grain_size_select.disable()
                                     grain_size_select.update()
-                                # Disable the slider and set ngrain to 1
+                                # Disable the slider and set ngrain to 10
                                 ngrain_slider.set_enabled(False)
-                                parameters.update({"ngrain": 1})
-                                ngrain_label.set_text("Number of Grains: 1")
+                                parameters.update({"ngrain": 10})
+                                ngrain_label.set_text("Number of Grains: 10")
                                 ngrain_slider.update()  # Update the slider to reflect the change   
                 grain_params.bind_visibility_from(primme_selected, 'value', lambda v: v == 'Run New Model')
                 # IC Shape does not seem intuitive so leaving out.
