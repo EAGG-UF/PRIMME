@@ -8,6 +8,8 @@
 
 Physics-Regularized Interpretable Machine Learning Microstructure Evolution (PRIMME): This code can be used to train and validate PRIMME neural network models for simulating isotropic microstructural grain growth.
 
+To Access the sample Training Dataset from SPPARKS, you can download it from [here](https://www.dropbox.com/scl/fi/v47g45hc4pzw225t94n23/trainset_spparks_sz-257x257-_ng-256-256-_nsets-200-_future-4-_max-100-_kt-0.66-_cut-0.h5?rlkey=050y5yond3j81reexydb0opzq&st=uiauni5d&dl=0).
+
 [Paper on the Model](https://doi.org/10.1016/j.matdes.2022.111032)
 
 ## Usage
