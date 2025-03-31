@@ -4,6 +4,7 @@
 # Data and Plots (Must be manually added)
 /PRIMME/data/*
 !/PRIMME/data/data.md
+!/PRIMME/data/trainset_spparks_sz(257x257)_ng(256-256)_nsets(200)_future(4)_max(100)_kt(0.66)_cut(0).h5
 /PRIMME/plots/*
 
 /PRIMME/__pycache__/*
