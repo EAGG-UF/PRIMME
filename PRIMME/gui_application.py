@@ -221,7 +221,7 @@ def create_app():
                         grain_size_select = ui.select(options=[257, 512, 1024, 2048, 2400], label='Grain Size', value=parameters['grain_size'], 
                                 on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('!w-full')
         
-                        ui.select(options=['grain', 'circle', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
+                        ui.select(options=['grain', 'circular', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
                                 on_change=lambda e: (parameters.update({"grain_shape": e.value}), update_grain(e))).classes('!w-full')
             
                     # Create the input fields that should be conditionally visible
@@ -274,14 +274,17 @@ def create_app():
                                 grain_size_select.update()
                             else:
                                 if e.value == 'hex':
-                                    grain_size_select.set_value(443)
+                                    grain_size_select.disable()
+                                    grain_size_select.update()
+                                if e.value == 'circular':
+                                    grain_size_select.set_value(257)
                                     grain_size_select.disable()
                                     grain_size_select.update()
                                 # Disable the slider and set ngrain to 10
-                                ngrain_slider.set_enabled(False)
-                                parameters.update({"ngrain": 10})
-                                ngrain_label.set_text("Number of Grains: 10")
-                                ngrain_slider.update()  # Update the slider to reflect the change   
+                                # ngrain_slider.set_enabled(False)
+                                # parameters.update({"ngrain": 10})
+                                # ngrain_label.set_text("Number of Grains: 10")
+                                # ngrain_slider.update()  # Update the slider to reflect the change   
                 grain_params.bind_visibility_from(primme_selected, 'value', lambda v: v == 'Run New Model')
                 # IC Shape does not seem intuitive so leaving out.
                 # ui.input(label='IC Shape', value=parameters['ic_shape'], 
