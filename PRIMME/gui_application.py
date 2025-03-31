@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import glob
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))   
-os.chdir(__location__) # ensure that the working directory is where this scipt is located.
+os.chdir(__location__) # ensure that the working directory is where this script is located.
 
 fp = './data/'
 if not os.path.exists(fp): os.makedirs(fp)
@@ -25,6 +25,25 @@ if not os.path.exists(fp): os.makedirs(fp)
 fp = './plots/'
 if not os.path.exists(fp): os.makedirs(fp)
 
+class VisibilityLogic:
+    def __init__(self):
+        self.model_name_value = ''
+        self.primme_selected_value = ''
+        self.show_params = False
+
+    def update_model_name(self, value):
+        self.model_name_value = value
+        self.update_visibility()
+
+    def update_primme_selected(self, value):
+        self.primme_selected_value = value
+        self.update_visibility()
+
+    def update_visibility(self):
+        self.show_params = (self.model_name_value == 'Train New Model' and 
+                            self.primme_selected_value == 'Run New Model')
+        ui.update()
+        
 # Function to run the script with the selected parameters
 def run_primme_simulation(parameters, console_output, stop_event):
     # Build command with parameters
@@ -154,14 +173,29 @@ def create_app():
             with ui.card().classes('w-full'):
                 ui.label('Training Parameters').classes('text-xl font-bold')
                 
-                ui.select(options=spparks_trainsets, label='Training Set', value=parameters['trainset'], 
-                         on_change=lambda e: parameters.update({"trainset": e.value})).classes('w-full')
-                
-                model_name = ui.select(options=['Train New Model'] + models_trained, label='Model Name', value=parameters['modelname'] or 'Train New Model', 
-                         on_change=lambda e: parameters.update({"modelname": e.value if e.value != 'Train New Model' else None})).classes('w-full')
-                
+                visibility_logic = VisibilityLogic()
+                primme_selected = ui.select(
+                    options=["Run New Model"] + primme_simulations, 
+                    label='PRIMME Simulation', 
+                    value=parameters['primme'] or 'Run New Model',
+                    on_change=lambda e: (
+                        parameters.update({"primme": e.value if e.value != 'Run New Model' else None}),
+                        visibility_logic.update_primme_selected(e.value)
+                    )
+                ).classes('w-full')
+                visibility_logic.update_primme_selected(primme_selected.value)
 
+                model_name = ui.select(options=['Train New Model'] + models_trained, label='Model Name', value=parameters['modelname'] or 'Train New Model', 
+                         on_change=lambda e: (
+                             parameters.update({"modelname": e.value if e.value != 'Train New Model' else None}), 
+                            visibility_logic.update_model_name(e.value))
+                ).classes('w-full')
+                visibility_logic.update_model_name(model_name.value)
+
+                model_name.bind_visibility_from(primme_selected, 'value', lambda v: v == 'Run New Model')
                 with ui.column().classes('w-full gap-4') as model_params:
+                    ui.select(options=spparks_trainsets, label='Training Set', value=parameters['trainset'], 
+                         on_change=lambda e: parameters.update({"trainset": e.value})).classes('w-full')  
                     with ui.row().classes('gap-4 items-center justify-between'):
                         # ui.select(options=[2, 3], label='Training Dimensions', value=parameters['dims'], 
                         #         on_change=lambda e: parameters.update({"dims": int(e.value)})).classes('w-auto min-w-[150px]')
@@ -169,14 +203,6 @@ def create_app():
                                 on_change=lambda e: parameters.update({"obs_dim": int(e.value)})).classes('w-auto min-w-[150px]')
                         ui.select(options=[7,9,11,13,15,17,19,21], label='Action Dimension', value=parameters['act_dim'], 
                                 on_change=lambda e: parameters.update({"act_dim": int(e.value)})).classes('w-auto min-w-[150px]')
-
-                
-                # Leaving out customization for these:
-                # with ui.row():
-                #     ui.number(label='Learning Rate', value=parameters['lr'], format='%.5f', 
-                #              on_change=lambda e: parameters.update({"lr": float(e.value)}))
-                #     ui.number(label='Regularization', value=parameters['reg'], 
-                #              on_change=lambda e: parameters.update({"reg": float(e.value)}))
                 
                     with ui.row():
                         def update_num_eps(e):
@@ -192,27 +218,17 @@ def create_app():
                 
                     ui.checkbox('Output Plots During Training', value=parameters['if_plot'], 
                             on_change=lambda e: parameters.update({"if_plot": e.value}))
-                    
-                model_params.bind_visibility_from(model_name, 'value', lambda v: v == 'Train New Model')
-                # The two below options are generally not changed so leaving out.
-                    # ui.number(label='Number of Samples', value=parameters['n_samples'], 
-                    #          on_change=lambda e: parameters.update({"n_samples": int(e.value)}))
                 
-                # ui.select(options=['Single_Step'], label='Mode', value=parameters['mode'], 
-                #          on_change=lambda e: parameters.update({"mode": e.value}))
-                
-                
-                # Can add later, but not intuitive right now.
-                # ui.checkbox('Output Plots After Simulation', value=parameters['if_output_plot'],
-                #             on_change=lambda e: parameters.update({"if_output_plot": e.value}))
-        
+            model_params.bind_visibility_from(visibility_logic, 'show_params')
         with ui.tab_panel(grain_tab):
             with ui.card().classes('w-full'):
                 ui.label('Testing Parameters').classes('text-xl font-bold')
-
-                primme_selected = ui.select(options=["Run New Model"] + primme_simulations, label='PRIMME Simulation', value=parameters['primme'] or 'Run New Model',
-                            on_change=lambda e: parameters.update({"primme": e.value if e.value != 'Run New Model' else None})).classes('w-full')
                 
+                with ui.row().classes('w-full') as PRIMME_Card:
+                    with ui.card().classes('no-shadow border-[1px]'):
+                        ui.label('A PRIMME Model has been selected, simulation will just compute grain stats and output results.')
+                PRIMME_Card.bind_visibility_from(primme_selected, 'value', lambda v: v != 'Run New Model')
+
                 with ui.row().classes('w-full') as grain_params:
                     voroni_checkbox = ui.checkbox('Voroni Loaded', value=parameters['voroni_loaded'], 
                     on_change=lambda e: parameters.update({"voroni_loaded": e.value}))
@@ -236,7 +252,7 @@ def create_app():
                         ui.input(label='Miso Angles Path', value=parameters['ma'], 
                                 on_change=lambda e: parameters.update({"ma": e.value})).classes('w-full')
                     
-                            # Bind the visibility of the path inputs to the checkbox value
+                    # Bind the visibility of the path inputs to the checkbox value
                     loaded_inputs.bind_visibility_from(voroni_checkbox, 'value')
                     non_loaded_inputs.bind_visibility_from(voroni_checkbox, 'value', backward=lambda x: not x)
 
@@ -280,15 +296,8 @@ def create_app():
                                     grain_size_select.set_value(257)
                                     grain_size_select.disable()
                                     grain_size_select.update()
-                                # Disable the slider and set ngrain to 10
-                                # ngrain_slider.set_enabled(False)
-                                # parameters.update({"ngrain": 10})
-                                # ngrain_label.set_text("Number of Grains: 10")
-                                # ngrain_slider.update()  # Update the slider to reflect the change   
+
                 grain_params.bind_visibility_from(primme_selected, 'value', lambda v: v == 'Run New Model')
-                # IC Shape does not seem intuitive so leaving out.
-                # ui.input(label='IC Shape', value=parameters['ic_shape'], 
-                #          on_change=lambda e: parameters.update({"ic_shape": e.value})).classes('w-full')
                 
                      
         
