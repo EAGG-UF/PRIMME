@@ -81,7 +81,7 @@ def main(args):
     print(f"Detected IC shape: {ic_shape}")
     fs.compute_grain_stats(fp)
     fs.make_videos(fp, ic_shape=ic_shape)
-    if ic_shape == ("square" or "circular" or "hex"):
+    if ic_shape == 'square' or ic_shape == 'circular' or ic_shape == 'hex':
         print(f"Skipping time plots as they are not compatible with: {ic_shape} IC shape.")
     else:
         fs.make_time_plots(fp, ic_shape=ic_shape, if_plot=args.if_output_plot)

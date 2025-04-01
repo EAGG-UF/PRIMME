@@ -237,7 +237,7 @@ def create_app():
                         grain_size_select = ui.select(options=[257, 512, 1024, 2048, 2400], label='Grain Size', value=parameters['grain_size'], 
                                 on_change=lambda e: parameters.update({"grain_size": int(e.value)})).classes('!w-full')
         
-                        ui.select(options=['grain', 'circular', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
+                        grain_shape = ui.select(options=['grain', 'circular', 'hex', 'square'], label='Grain Shape', value=parameters['grain_shape'], 
                                 on_change=lambda e: (parameters.update({"grain_shape": e.value}), update_grain(e))).classes('!w-full')
             
                     # Create the input fields that should be conditionally visible
@@ -263,9 +263,10 @@ def create_app():
                             parameters.update({"ngrain": ngrain})
                             ngrain_label.set_text(f"Number of Grains: 2^{exponent} or {ngrain}")
                         
-                        ngrain_label = ui.label(f"Number of Grains: 2^10 or {parameters['ngrain']}").classes('font-bold')
-                        ngrain_slider = ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
-                                            on_change=update_ngrain).classes('w-full -mt-5')
+                        with ui.row().classes('w-full') as ngrain_controller:
+                            ngrain_label = ui.label(f"Number of Grains: 2^10 or {parameters['ngrain']}").classes('font-bold')
+                            ngrain_slider = ui.slider(min=6, max=18, value=parameters['ngrain'].bit_length() - 1, 
+                                                on_change=update_ngrain).classes('w-full -mt-5')
                         
                         def update_num_steps(e):
                             parameters.update({"nsteps": int(e.value)})
@@ -275,6 +276,7 @@ def create_app():
                         ui.slider(min=10, max=1000, step=5, value=parameters['nsteps'], 
                                 on_change=update_num_steps).classes('w-full -mt-5')
 
+                        ngrain_controller.bind_visibility_from(grain_shape, 'value', lambda v: v == ('grain'))
                         # Update the grain shape change handler to also update the ngrain slider
                         def update_grain(e):
                             if e.value == 'grain':
@@ -290,10 +292,12 @@ def create_app():
                                 grain_size_select.update()
                             else:
                                 if e.value == 'hex':
+                                    parameters.update({"ngrain": 64})
                                     grain_size_select.disable()
                                     grain_size_select.update()
-                                if e.value == 'circular':
+                                if e.value == 'circular' or e.value == 'square':
                                     grain_size_select.set_value(257)
+                                    parameters.update({"ngrain": 2})
                                     grain_size_select.disable()
                                     grain_size_select.update()
 
