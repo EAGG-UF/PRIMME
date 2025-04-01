@@ -53,10 +53,10 @@ python gui_application.py
 
 ### Isotropic Case
 
-<div style="display: flex; justify-content: center; align-items: center;">
-  <img src="materials/mf.gif" style="width: 25%;" loop="infinite"/>&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="materials/mcp.gif" style="width: 25%;" loop="infinite"/>&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="materials/phase_field.gif" style="width: 25%;" loop="infinite"/>
+<div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; align-items: center;">
+  <img src="materials/mf.gif" style="width: 300px; max-width: 30%; min-width: 200px;" loop="infinite"/>
+  <img src="materials/mcp.gif" style="width: 300px; max-width: 30%; min-width: 200px;" loop="infinite"/>
+  <img src="materials/phase_field.gif" style="width: 300px; max-width: 30%; min-width: 200px;" loop="infinite"/>
 </div>
 <p align="middle">
     <em >Training on mode filter(left), Training on MCP(mid) and Training on phase field (right).</em>
@@ -65,9 +65,9 @@ python gui_application.py
 
 ### Anisotropic Case
 
-<div style="display: flex; justify-content: center; align-items: center;">
-  <img src="materials/mf_incl.gif" style="width: 25%;" loop=infinite/>&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="materials/mcp_incl.gif" style="width: 25%;" loop=infinite/>
+<div style="display: flex; flex-wrap: wrap; gap: 20px;justify-content: center; align-items: center;">
+  <img src="materials/mf_incl.gif" style="width: 300px; max-width: 30%; min-width: 200px;;" loop=infinite/>
+  <img src="materials/mcp_incl.gif" style="width: 300px; max-width: 30%; min-width: 200px;" loop=infinite/>
 </div>
 <p align="middle">
     <em >Training on mode filter(left) and Training on phase field (right).</em>
