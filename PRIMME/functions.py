@@ -263,6 +263,50 @@ def generate_train_init(filename, grain_shape, grain_sizes, device, miso_array =
     
     return ic, ea, miso_array, miso_matrix 
 
+# Determine shape from PRIMME output
+def detect_ic_shape(fp_save):
+    """
+    Detect if the initial condition is circular, square, hex, or general grain pattern.
+    Returns: str - "circular", "square", "hex", or "grain"
+    """
+    with h5py.File(fp_save, 'r') as f:
+        sim_key = list(f.keys())[0]  # usually 'sim0'
+        initial_state = f[f'{sim_key}/ims_id'][0, 0]  # Remove timestep and channel dims
+        
+        unique_grains = np.unique(initial_state)
+        num_grains = len(unique_grains)
+        shape = initial_state.shape
+        center = (np.array(shape) - 1) / 2
+        
+        if num_grains == 2:  # Circular and Square have 2 grains
+            # Get boundary points using padding to maintain shape
+            padded = np.pad(initial_state, ((1,1), (1,1)), mode='edge')
+            dx = np.abs(padded[1:-1, 2:] - padded[1:-1, :-2])
+            dy = np.abs(padded[2:, 1:-1] - padded[:-2, 1:-1])
+            grain_boundary = dx + dy
+            boundary_points = np.column_stack(np.where(grain_boundary > 0))
+            
+            if boundary_points.size > 0:
+                # Calculate distances from center to boundary points
+                distances = np.sqrt(np.sum((boundary_points - center)**2, axis=1))
+                # If standard deviation of distances is small, it's likely a circle
+                if np.std(distances) / np.mean(distances) < 0.1:
+                    return "circular"
+                else:
+                    return "square"
+        
+        elif num_grains == 3:  # 3-grain case
+            unique_counts = np.unique(initial_state, return_counts=True)[1]
+            if len(unique_counts) == 3:
+                return "3grain"
+        
+        elif num_grains >= 64:  # Hex typically has 64 grains
+            unique_counts = np.unique(initial_state, return_counts=True)[1]
+            if np.std(unique_counts) / np.mean(unique_counts) < 0.2:
+                return "hex"
+        
+        return "grain"
+
 ### Run and read SPPARKS
 
 def image2init(img, EulerAngles, fp=None):
@@ -1206,18 +1250,19 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
         xs.append(xx)
     
     plt.figure()
-    for i in range(len(hps)):
-        plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
-        plt.xlim([np.max(xs[i]), np.min(xs[i])])
-        legend.append('Slope: %.3f | R2: %.3f'%(ps[i][0], rs[i]))
-    plt.title('Average grain area (scaled)')
-    plt.xlabel('Number of grains')
-    plt.ylabel('Average area (pixels)')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_area_time_scaled'%(sub_folder, ic_shape), dpi=300)
-    if if_plot:
-        plt.show()
-        plt.close()
+    if not (ic_shape == 'square' or ic_shape == 'circular'):
+        for i in range(len(hps)):
+            plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
+            plt.xlim([np.max(xs[i]), np.min(xs[i])])
+            legend.append('Slope: %.3f | R2: %.3f'%(ps[i][0], rs[i]))
+        plt.title('Average grain area (scaled)')
+        plt.xlabel('Number of grains')
+        plt.ylabel('Average area (pixels)')
+        if legend!=[]: plt.legend(legend)
+        plt.savefig('./plots/%s/%s_avg_grain_area_time_scaled'%(sub_folder, ic_shape), dpi=300)
+        if if_plot:
+            plt.show()
+            plt.close()
     
     # Plot average grain sides through time
     log = []
@@ -1241,18 +1286,20 @@ def make_time_plots(hps, ic_shape, sub_folder="", legend = [], gps='last', scale
         
     # Plot scaled average grain sides through time
     plt.figure()
-    for i in range(len(hps)):
-        plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
-        plt.xlim([np.max(xs[i]), np.min(xs[i])])
-        legend.append('')
-    plt.title('Average number of grain sides (scaled)')
-    plt.xlabel('Number of grains')
-    plt.ylabel('Average number of sides')
-    if legend!=[]: plt.legend(legend)
-    plt.savefig('./plots/%s/%s_avg_grain_sides_time_scaled'%(sub_folder, ic_shape), dpi=300)
-    if if_plot:
-        plt.show()
-        plt.close()
+    # Seems to not be compatible with 2-grain
+    if not (ic_shape == 'square' or ic_shape == 'circular'):
+        for i in range(len(hps)):
+            plt.plot(xs[i], log[i][:len(xs[i])], c=c[i%len(c)])
+            plt.xlim([np.max(xs[i]), np.min(xs[i])])
+            legend.append('')
+        plt.title('Average number of grain sides (scaled)')
+        plt.xlabel('Number of grains')
+        plt.ylabel('Average number of sides')
+        if legend!=[]: plt.legend(legend)
+        plt.savefig('./plots/%s/%s_avg_grain_sides_time_scaled'%(sub_folder, ic_shape), dpi=300)
+        if if_plot:
+            plt.show()
+            plt.close()
         
     # Plot grain size distribution
     plt.figure()

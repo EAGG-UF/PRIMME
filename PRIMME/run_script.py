@@ -77,9 +77,14 @@ def main(args):
     
     # Generate plots and statistics
     print("Computing grain statistics and generating plots")
+    ic_shape = fs.detect_ic_shape(fp)
+    print(f"Detected IC shape: {ic_shape}")
     fs.compute_grain_stats(fp)
     fs.make_videos(fp, ic_shape=ic_shape)
-    fs.make_time_plots(fp, ic_shape=ic_shape, if_plot=args.if_output_plot)
+    if ic_shape == ("square" or "circular" or "hex"):
+        print(f"Skipping time plots as they are not compatible with: {ic_shape} IC shape.")
+    else:
+        fs.make_time_plots(fp, ic_shape=ic_shape, if_plot=args.if_output_plot)
     
     print(f"PRIMME simulation complete. Results saved to: {fp}")
 
